@@ -63,17 +63,30 @@ export async function POST(request: Request) {
     }, { status: 404 })
   }
 
-  // 3. Trouver l'ECUE via le nom de la feuille
-  const { data: ecue } = await supabase
+  // 3. Trouver l'ECUE via le nom de la feuille (correspondance exacte puis insensible à la casse)
+  const sheetNameTrimmed = String(sheet_name).trim()
+  let { data: ecue } = await supabase
     .from('ecues')
     .select('id, nom')
     .eq('niveau_id', niveau.id)
-    .eq('google_sheet_name', sheet_name)
+    .eq('google_sheet_name', sheetNameTrimmed)
     .single()
+
+  // Fallback : correspondance insensible à la casse
+  if (!ecue) {
+    const { data: ecues } = await supabase
+      .from('ecues')
+      .select('id, nom, google_sheet_name')
+      .eq('niveau_id', niveau.id)
+
+    ecue = ecues?.find(e =>
+      e.google_sheet_name?.trim().toLowerCase() === sheetNameTrimmed.toLowerCase()
+    ) ?? null
+  }
 
   if (!ecue) {
     return NextResponse.json({
-      error: `Aucune ECUE trouvée pour la feuille "${sheet_name}". Vérifiez la configuration dans /admin/ecues.`
+      error: `Aucune ECUE trouvée pour la feuille "${sheetNameTrimmed}". Vérifiez la configuration dans /admin/ecues.`
     }, { status: 404 })
   }
 
