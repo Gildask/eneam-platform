@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -26,8 +26,8 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
 
-  // Routes protégées : rediriger vers login si non connecté
-  const isProtectedRoute = pathname.startsWith('/notes') ||
+  const isProtectedRoute =
+    pathname.startsWith('/notes') ||
     pathname.startsWith('/documents') ||
     pathname.startsWith('/reclamations') ||
     pathname.startsWith('/admin')
@@ -36,9 +36,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Si connecté et sur /login, rediriger vers l'espace approprié
   if (pathname === '/login' && user) {
-    const isAdmin = user.email === process.env.ADMIN_EMAIL || user.app_metadata?.role === 'admin'
+    const isAdmin = user.email === process.env.ADMIN_EMAIL
     return NextResponse.redirect(new URL(isAdmin ? '/admin' : '/notes', request.url))
   }
 
