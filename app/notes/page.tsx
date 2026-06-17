@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { unstable_noStore as noStore } from 'next/cache'
 import type { NoteType } from '@/lib/types'
+import RefreshButton from './RefreshButton'
+
+export const dynamic = 'force-dynamic'
 
 const NOTE_LABELS: Record<NoteType, string> = {
   CC1: 'CC 1',
@@ -28,6 +32,7 @@ function noteColor(valeur: number | null) {
 }
 
 export default async function NotesPage() {
+  noStore()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -69,11 +74,14 @@ export default async function NotesPage() {
   return (
     <div className="space-y-6">
       {/* En-tête */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Mes notes</h1>
-        {annee && (
-          <p className="text-sm text-gray-500 mt-0.5">Année académique {annee.libelle}</p>
-        )}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Mes notes</h1>
+          {annee && (
+            <p className="text-sm text-gray-500 mt-0.5">Année académique {annee.libelle}</p>
+          )}
+        </div>
+        <RefreshButton />
       </div>
 
       {/* Infos étudiant */}
