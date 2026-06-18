@@ -196,7 +196,7 @@ export default async function NotesPage() {
             <span className="text-orange-500 text-sm font-semibold">Reprises</span>
             <span className="text-orange-400 text-xs">— matières de {niveauNom}</span>
           </div>
-          <NotesTable ecues={ecues} notesIndex={notesIndex} typesPresents={typesPresents} />
+          <NotesTable ecues={ecues} notesIndex={notesIndex} typesPresents={['reprise']} />
         </div>
       ))}
 
