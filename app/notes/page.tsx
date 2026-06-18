@@ -130,7 +130,7 @@ export default async function NotesPage() {
       .select('id, code, nom, coefficient, credits, niveau_id, niveaux(nom, code)')
       .in('id', ecueIdsReprises)
       .order('code')
-    ecuesReprises = (data ?? []) as typeof ecuesReprises
+    ecuesReprises = (data ?? []) as unknown as typeof ecuesReprises
   }
 
   // Grouper les reprises par niveau d'origine
