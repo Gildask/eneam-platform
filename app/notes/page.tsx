@@ -116,31 +116,34 @@ export default async function NotesPage() {
   const notesIndex = new Map<string, number | null>()
   notes?.forEach(n => notesIndex.set(`${n.ecue_id}-${n.type}`, n.valeur))
 
-  // ECUEs des reprises : notes dont l'ecue_id n'appartient pas au niveau actuel
-  const ecueIdsNiveau = new Set(ecuesNiveau?.map(e => e.id) ?? [])
-  const ecueIdsReprises = [...new Set(
-    notes?.filter(n => !ecueIdsNiveau.has(n.ecue_id) && n.valeur !== null).map(n => n.ecue_id) ?? []
-  )]
+  // Reprises : requête directe pour les notes dont l'ECUE appartient à un autre niveau
+  // On passe par la table notes en joignant ecues pour filtrer côté DB
+  const { data: notesReprisesRaw } = await supabase
+    .from('notes')
+    .select('ecue_id, type, valeur, ecues!inner(id, code, nom, coefficient, credits, niveau_id, niveaux!inner(nom, code))')
+    .eq('etudiant_id', user.id)
+    .eq('annee_academique_id', annee?.id ?? '')
+    .neq('ecues.niveau_id', etudiant?.niveau_id ?? '')
+    .not('valeur', 'is', null)
 
-  // Récupérer les détails des ECUEs de reprises avec leur niveau
-  let ecuesReprises: { id: string; code: string; nom: string; coefficient: number; credits: number; niveau_id: string; niveaux: { nom: string; code: string } | null }[] = []
-  if (ecueIdsReprises.length > 0) {
-    const { data } = await supabase
-      .from('ecues')
-      .select('id, code, nom, coefficient, credits, niveau_id, niveaux(nom, code)')
-      .in('id', ecueIdsReprises)
-      .order('code')
-    ecuesReprises = (data ?? []) as unknown as typeof ecuesReprises
-  }
+  // Construire la map ECUE → infos pour les reprises
+  type EcueReprise = { id: string; code: string; nom: string; coefficient: number; credits: number; niveau_id: string; niveaux: { nom: string; code: string } | null }
+  const ecuesReprisesMap = new Map<string, EcueReprise>()
+  ;(notesReprisesRaw ?? []).forEach((n: any) => {
+    const e = n.ecues as EcueReprise
+    if (e && !ecuesReprisesMap.has(e.id)) ecuesReprisesMap.set(e.id, e)
+  })
 
-  // Grouper les reprises par niveau d'origine
-  const reprisesByNiveau = ecuesReprises.reduce<Record<string, { niveauNom: string; ecues: typeof ecuesReprises }>>((acc, e) => {
+  // Grouper par niveau d'origine
+  const reprisesByNiveau: Record<string, { niveauNom: string; ecues: EcueReprise[] }> = {}
+  ecuesReprisesMap.forEach((e) => {
     const key = e.niveau_id
     const niveauNom = e.niveaux?.nom ?? 'Autre niveau'
-    if (!acc[key]) acc[key] = { niveauNom, ecues: [] }
-    acc[key]!.ecues.push(e)
-    return acc
-  }, {})
+    if (!reprisesByNiveau[key]) reprisesByNiveau[key] = { niveauNom, ecues: [] }
+    reprisesByNiveau[key]!.ecues.push(e)
+  })
+  // Trier les ECUEs dans chaque groupe
+  Object.values(reprisesByNiveau).forEach(g => g.ecues.sort((a, b) => a.code.localeCompare(b.code)))
 
   const typesPresents: NoteType[] = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage', 'reprise']
 
