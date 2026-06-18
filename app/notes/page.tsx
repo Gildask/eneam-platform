@@ -31,6 +31,53 @@ function noteColor(valeur: number | null) {
   return 'text-red-500 font-semibold'
 }
 
+function NotesTable({ ecues, notesIndex, typesPresents }: {
+  ecues: { id: string; code: string; nom: string; coefficient: number }[]
+  notesIndex: Map<string, number | null>
+  typesPresents: NoteType[]
+}) {
+  return (
+    <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100">
+            <th className="sticky top-0 z-10 bg-white text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
+            <th className="sticky top-0 z-10 bg-white text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
+            {typesPresents.map(type => (
+              <th key={type} className="sticky top-0 z-10 bg-white text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">
+                <span className={`text-xs px-2 py-0.5 rounded-full ${NOTE_COLORS[type]}`}>
+                  {NOTE_LABELS[type]}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {ecues.map((ecue) => (
+            <tr key={ecue.id} className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-3">
+                <p className="font-medium text-gray-800">{ecue.nom}</p>
+                <p className="text-xs text-gray-400">{ecue.code}</p>
+              </td>
+              <td className="text-center px-2 py-3 text-gray-500">{ecue.coefficient}</td>
+              {typesPresents.map(type => {
+                const valeur = notesIndex.get(`${ecue.id}-${type}`) ?? null
+                return (
+                  <td key={type} className="text-center px-3 py-3">
+                    <span className={noteColor(valeur)}>
+                      {valeur !== null ? valeur.toFixed(2) : '—'}
+                    </span>
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 export default async function NotesPage() {
   noStore()
   const supabase = await createClient()
@@ -51,14 +98,14 @@ export default async function NotesPage() {
     .eq('id', user.id)
     .single()
 
-  // ECUEs du niveau
-  const { data: ecues } = await supabase
+  // ECUEs du niveau actuel
+  const { data: ecuesNiveau } = await supabase
     .from('ecues')
-    .select('id, code, nom, coefficient, credits')
+    .select('id, code, nom, coefficient, credits, niveau_id')
     .eq('niveau_id', etudiant?.niveau_id ?? '')
     .order('code')
 
-  // Notes de l'étudiant pour l'année active
+  // Toutes les notes de l'étudiant pour l'année active
   const { data: notes } = await supabase
     .from('notes')
     .select('ecue_id, type, valeur')
@@ -68,6 +115,32 @@ export default async function NotesPage() {
   // Index notes par ecue_id + type
   const notesIndex = new Map<string, number | null>()
   notes?.forEach(n => notesIndex.set(`${n.ecue_id}-${n.type}`, n.valeur))
+
+  // ECUEs des reprises : notes dont l'ecue_id n'appartient pas au niveau actuel
+  const ecueIdsNiveau = new Set(ecuesNiveau?.map(e => e.id) ?? [])
+  const ecueIdsReprises = [...new Set(
+    notes?.filter(n => !ecueIdsNiveau.has(n.ecue_id)).map(n => n.ecue_id) ?? []
+  )]
+
+  // Récupérer les détails des ECUEs de reprises avec leur niveau
+  let ecuesReprises: { id: string; code: string; nom: string; coefficient: number; credits: number; niveau_id: string; niveaux: { nom: string; code: string } | null }[] = []
+  if (ecueIdsReprises.length > 0) {
+    const { data } = await supabase
+      .from('ecues')
+      .select('id, code, nom, coefficient, credits, niveau_id, niveaux(nom, code)')
+      .in('id', ecueIdsReprises)
+      .order('code')
+    ecuesReprises = (data ?? []) as typeof ecuesReprises
+  }
+
+  // Grouper les reprises par niveau d'origine
+  const reprisesByNiveau = ecuesReprises.reduce<Record<string, { niveauNom: string; ecues: typeof ecuesReprises }>>((acc, e) => {
+    const key = e.niveau_id
+    const niveauNom = e.niveaux?.nom ?? 'Autre niveau'
+    if (!acc[key]) acc[key] = { niveauNom, ecues: [] }
+    acc[key]!.ecues.push(e)
+    return acc
+  }, {})
 
   const typesPresents: NoteType[] = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage', 'reprise']
 
@@ -104,47 +177,10 @@ export default async function NotesPage() {
         </div>
       )}
 
-      {/* Tableau des notes */}
-      {ecues && ecues.length > 0 ? (
+      {/* Tableau des notes du niveau actuel */}
+      {ecuesNiveau && ecuesNiveau.length > 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto max-h-[70vh]">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="sticky top-0 z-10 bg-white text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
-                  <th className="sticky top-0 z-10 bg-white text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
-                  {typesPresents.map(type => (
-                    <th key={type} className="sticky top-0 z-10 bg-white text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${NOTE_COLORS[type]}`}>
-                        {NOTE_LABELS[type]}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {ecues.map((ecue) => (
-                  <tr key={ecue.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800">{ecue.nom}</p>
-                      <p className="text-xs text-gray-400">{ecue.code}</p>
-                    </td>
-                    <td className="text-center px-2 py-3 text-gray-500">{ecue.coefficient}</td>
-                    {typesPresents.map(type => {
-                      const valeur = notesIndex.get(`${ecue.id}-${type}`) ?? null
-                      return (
-                        <td key={type} className="text-center px-3 py-3">
-                          <span className={noteColor(valeur)}>
-                            {valeur !== null ? valeur.toFixed(2) : '—'}
-                          </span>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <NotesTable ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresents} />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
@@ -152,6 +188,17 @@ export default async function NotesPage() {
           <p className="text-gray-300 text-sm mt-1">Contactez le service des programmes spéciaux.</p>
         </div>
       )}
+
+      {/* Section Reprises : matières des années antérieures */}
+      {Object.entries(reprisesByNiveau).map(([niveauId, { niveauNom, ecues }]) => (
+        <div key={niveauId} className="bg-white rounded-xl border border-orange-100 overflow-hidden">
+          <div className="px-4 py-3 bg-orange-50 border-b border-orange-100 flex items-center gap-2">
+            <span className="text-orange-500 text-sm font-semibold">Reprises</span>
+            <span className="text-orange-400 text-xs">— matières de {niveauNom}</span>
+          </div>
+          <NotesTable ecues={ecues} notesIndex={notesIndex} typesPresents={typesPresents} />
+        </div>
+      ))}
 
       {/* Légende */}
       <div className="flex flex-wrap gap-4 text-xs text-gray-400">
