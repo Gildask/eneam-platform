@@ -80,6 +80,10 @@ export default function NotesForm({
     let nextRow = rowIdx
     let nextCol = colIdx
 
+    if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab'].includes(e.key)) {
+      e.preventDefault()
+    }
+
     if (e.key === 'ArrowDown' || e.key === 'Enter') {
       nextRow = rowIdx + 1 < numRows ? rowIdx + 1 : rowIdx
     } else if (e.key === 'ArrowUp') {
