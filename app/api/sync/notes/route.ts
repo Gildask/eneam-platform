@@ -63,25 +63,51 @@ export async function POST(request: Request) {
     }, { status: 404 })
   }
 
-  // 3. Trouver l'ECUE via le nom de la feuille (correspondance exacte puis insensible à la casse)
+  // 3. Trouver l'ECUE via le nom de la feuille
   const sheetNameTrimmed = String(sheet_name).trim()
-  let { data: ecue } = await supabase
+
+  // Normalise un nom : minuscules, sans accents, sans caractères spéciaux
+  function normalize(s: string) {
+    return s.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '') // supprimer accents
+      .replace(/[^a-z0-9\-]/g, '')                      // garder lettres, chiffres, tirets
+      .trim()
+  }
+
+  // Extrait le préfixe numérique "01", "09", "21", etc.
+  function extractPrefix(s: string) {
+    const m = s.match(/^(\d+)/)
+    return m ? m[1].padStart(2, '0') : null
+  }
+
+  const { data: ecues } = await supabase
     .from('ecues')
-    .select('id, nom')
+    .select('id, nom, google_sheet_name')
     .eq('niveau_id', niveau.id)
-    .eq('google_sheet_name', sheetNameTrimmed)
-    .single()
 
-  // Fallback : correspondance insensible à la casse
+  let ecue = ecues?.find(e => e.google_sheet_name?.trim() === sheetNameTrimmed) ?? null
+
+  // Fallback 1 : insensible à la casse
   if (!ecue) {
-    const { data: ecues } = await supabase
-      .from('ecues')
-      .select('id, nom, google_sheet_name')
-      .eq('niveau_id', niveau.id)
-
     ecue = ecues?.find(e =>
       e.google_sheet_name?.trim().toLowerCase() === sheetNameTrimmed.toLowerCase()
     ) ?? null
+  }
+
+  // Fallback 2 : noms normalisés (accents, apostrophes, espaces)
+  if (!ecue) {
+    const normSheet = normalize(sheetNameTrimmed)
+    ecue = ecues?.find(e =>
+      normalize(e.google_sheet_name ?? '') === normSheet
+    ) ?? null
+  }
+
+  // Fallback 3 : correspondance par préfixe numérique uniquement (ex: "09-...")
+  if (!ecue) {
+    const sheetPrefix = extractPrefix(sheetNameTrimmed)
+    if (sheetPrefix) {
+      ecue = ecues?.find(e => extractPrefix(e.google_sheet_name ?? '') === sheetPrefix) ?? null
+    }
   }
 
   if (!ecue) {
