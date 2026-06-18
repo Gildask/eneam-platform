@@ -109,7 +109,7 @@ export default async function NotesPage() {
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-white shadow-sm">
                 <tr className="border-b border-gray-100">
                   <th className="text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
                   <th className="text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
