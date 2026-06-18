@@ -74,6 +74,36 @@ export default function NotesForm({
     }))
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number, colIdx: number) {
+    const numRows = etudiantsFiltres.length
+    const numCols = TYPES.length
+    let nextRow = rowIdx
+    let nextCol = colIdx
+
+    if (e.key === 'ArrowDown' || e.key === 'Enter') {
+      nextRow = rowIdx + 1 < numRows ? rowIdx + 1 : rowIdx
+    } else if (e.key === 'ArrowUp') {
+      nextRow = rowIdx - 1 >= 0 ? rowIdx - 1 : rowIdx
+    } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+      if (e.key === 'Tab') e.preventDefault()
+      if (colIdx + 1 < numCols) { nextCol = colIdx + 1 }
+      else if (rowIdx + 1 < numRows) { nextRow = rowIdx + 1; nextCol = 0 }
+    } else if (e.key === 'ArrowLeft') {
+      if (colIdx - 1 >= 0) { nextCol = colIdx - 1 }
+      else if (rowIdx - 1 >= 0) { nextRow = rowIdx - 1; nextCol = numCols - 1 }
+    } else {
+      return
+    }
+
+    if (nextRow !== rowIdx || nextCol !== colIdx) {
+      const next = document.querySelector<HTMLInputElement>(
+        `input[data-row="${nextRow}"][data-col="${nextCol}"]`
+      )
+      next?.focus()
+      next?.select()
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!niveauId || !ecueId) return
@@ -153,11 +183,11 @@ export default function NotesForm({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {etudiantsFiltres.map(et => (
+              {etudiantsFiltres.map((et, rowIdx) => (
                 <tr key={et.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-gray-400 text-xs">{et.matricule}</td>
                   <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{et.prenom} {et.nom}</td>
-                  {TYPES.map(t => (
+                  {TYPES.map((t, colIdx) => (
                     <td key={t.value} className="px-3 py-2 text-center">
                       <input
                         type="number"
@@ -166,7 +196,10 @@ export default function NotesForm({
                         step="0.25"
                         value={grid[et.id]?.[t.value] ?? ''}
                         onChange={e => setNote(et.id, t.value, e.target.value)}
+                        onKeyDown={e => handleKeyDown(e, rowIdx, colIdx)}
                         placeholder="—"
+                        data-row={rowIdx}
+                        data-col={colIdx}
                         className="w-20 text-center border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </td>
