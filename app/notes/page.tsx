@@ -109,12 +109,12 @@ export default async function NotesPage() {
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-white shadow-sm">
+              <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
-                  <th className="text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
+                  <th className="sticky top-0 z-10 bg-white text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
+                  <th className="sticky top-0 z-10 bg-white text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
                   {typesPresents.map(type => (
-                    <th key={type} className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">
+                    <th key={type} className="sticky top-0 z-10 bg-white text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${NOTE_COLORS[type]}`}>
                         {NOTE_LABELS[type]}
                       </span>
