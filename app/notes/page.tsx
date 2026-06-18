@@ -190,15 +190,23 @@ export default async function NotesPage() {
       )}
 
       {/* Section Reprises : matières des années antérieures */}
-      {Object.entries(reprisesByNiveau).map(([niveauId, { niveauNom, ecues }]) => (
-        <div key={niveauId} className="bg-white rounded-xl border border-orange-100 overflow-hidden">
-          <div className="px-4 py-3 bg-orange-50 border-b border-orange-100 flex items-center gap-2">
-            <span className="text-orange-500 text-sm font-semibold">Reprises</span>
-            <span className="text-orange-400 text-xs">— matières de {niveauNom}</span>
+      {Object.entries(reprisesByNiveau).map(([niveauId, { niveauNom, ecues }]) => {
+        // N'afficher que les colonnes qui ont au moins une note non nulle pour ces ECUEs
+        const ecueIds = new Set(ecues.map(e => e.id))
+        const typesAvecValeur = typesPresents.filter(t =>
+          notes?.some(n => ecueIds.has(n.ecue_id) && n.type === t && n.valeur !== null)
+        )
+        const typesReprise = typesAvecValeur.length > 0 ? typesAvecValeur : typesPresents
+        return (
+          <div key={niveauId} className="bg-white rounded-xl border border-orange-100 overflow-hidden">
+            <div className="px-4 py-3 bg-orange-50 border-b border-orange-100 flex items-center gap-2">
+              <span className="text-orange-500 text-sm font-semibold">Reprises</span>
+              <span className="text-orange-400 text-xs">— matières de {niveauNom}</span>
+            </div>
+            <NotesTable ecues={ecues} notesIndex={notesIndex} typesPresents={typesReprise} />
           </div>
-          <NotesTable ecues={ecues} notesIndex={notesIndex} typesPresents={['reprise']} />
-        </div>
-      ))}
+        )
+      })}
 
       {/* Légende */}
       <div className="flex flex-wrap gap-4 text-xs text-gray-400">
