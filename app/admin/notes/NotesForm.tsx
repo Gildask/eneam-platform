@@ -37,7 +37,7 @@ export default function NotesForm({
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null)
 
   const etudiantsFiltres = niveauId
-    ? etudiants.filter(e => e.niveau_id === niveauId).sort((a, b) => a.matricule.localeCompare(b.matricule))
+    ? etudiants.filter(e => e.niveau_id === niveauId).sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom))
     : []
 
   const ecuesFiltres = niveauId
@@ -190,7 +190,7 @@ export default function NotesForm({
               {etudiantsFiltres.map((et, rowIdx) => (
                 <tr key={et.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-gray-400 text-xs">{et.matricule}</td>
-                  <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{et.prenom} {et.nom}</td>
+                  <td className="px-4 py-2 font-medium text-gray-800 whitespace-nowrap">{et.nom} {et.prenom}</td>
                   {TYPES.map((t, colIdx) => (
                     <td key={t.value} className="px-3 py-2 text-center">
                       <input
