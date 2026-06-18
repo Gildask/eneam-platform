@@ -119,7 +119,7 @@ export default async function NotesPage() {
   // ECUEs des reprises : notes dont l'ecue_id n'appartient pas au niveau actuel
   const ecueIdsNiveau = new Set(ecuesNiveau?.map(e => e.id) ?? [])
   const ecueIdsReprises = [...new Set(
-    notes?.filter(n => !ecueIdsNiveau.has(n.ecue_id)).map(n => n.ecue_id) ?? []
+    notes?.filter(n => !ecueIdsNiveau.has(n.ecue_id) && n.valeur !== null).map(n => n.ecue_id) ?? []
   )]
 
   // Récupérer les détails des ECUEs de reprises avec leur niveau
