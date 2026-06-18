@@ -119,7 +119,7 @@ export async function POST(request: Request) {
   // 4. Trouver l'étudiant
   const { data: etudiant } = await supabase
     .from('etudiants')
-    .select('id, nom, prenom, matricule, email, telephone')
+    .select('id, nom, prenom, matricule, email, telephone, niveau_id')
     .eq('matricule', String(matricule).trim().toUpperCase())
     .single()
 
@@ -127,6 +127,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       error: `Étudiant introuvable : matricule "${matricule}".`
     }, { status: 404 })
+  }
+
+  // Validation : l'étudiant doit appartenir au niveau de ce classeur
+  // Les reprises passent uniquement par l'interface admin
+  if (etudiant.niveau_id !== niveau.id) {
+    return NextResponse.json({
+      error: `L'étudiant ${matricule} n'appartient pas au niveau de ce classeur. Les reprises se saisissent via l'interface admin (/admin/reprises).`
+    }, { status: 403 })
   }
 
   // 5. Trouver l'année académique active
