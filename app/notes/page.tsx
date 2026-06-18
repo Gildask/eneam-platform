@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import type { NoteType } from '@/lib/types'
@@ -116,34 +117,41 @@ export default async function NotesPage() {
   const notesIndex = new Map<string, number | null>()
   notes?.forEach(n => notesIndex.set(`${n.ecue_id}-${n.type}`, n.valeur))
 
-  // Reprises : requête directe pour les notes dont l'ECUE appartient à un autre niveau
-  // On passe par la table notes en joignant ecues pour filtrer côté DB
-  const { data: notesReprisesRaw } = await supabase
+  // Reprises : admin client pour récupérer toutes les notes hors niveau actuel
+  const supabaseAdmin = createAdminClient()
+  const ecueIdsNiveau = new Set(ecuesNiveau?.map(e => e.id) ?? [])
+
+  const { data: notesHorsNiveau } = await supabaseAdmin
     .from('notes')
-    .select('ecue_id, type, valeur, ecues!inner(id, code, nom, coefficient, credits, niveau_id, niveaux!inner(nom, code))')
+    .select('ecue_id, type, valeur')
     .eq('etudiant_id', user.id)
     .eq('annee_academique_id', annee?.id ?? '')
-    .neq('ecues.niveau_id', etudiant?.niveau_id ?? '')
     .not('valeur', 'is', null)
 
-  // Construire la map ECUE → infos pour les reprises
+  const ecueIdsReprises = [...new Set(
+    (notesHorsNiveau ?? []).filter(n => !ecueIdsNiveau.has(n.ecue_id)).map(n => n.ecue_id)
+  )]
+
   type EcueReprise = { id: string; code: string; nom: string; coefficient: number; credits: number; niveau_id: string; niveaux: { nom: string; code: string } | null }
-  const ecuesReprisesMap = new Map<string, EcueReprise>()
-  ;(notesReprisesRaw ?? []).forEach((n: any) => {
-    const e = n.ecues as EcueReprise
-    if (e && !ecuesReprisesMap.has(e.id)) ecuesReprisesMap.set(e.id, e)
-  })
+
+  let ecuesReprisesRaw: EcueReprise[] = []
+  if (ecueIdsReprises.length > 0) {
+    const { data } = await supabaseAdmin
+      .from('ecues')
+      .select('id, code, nom, coefficient, credits, niveau_id, niveaux(nom, code)')
+      .in('id', ecueIdsReprises)
+      .order('code')
+    ecuesReprisesRaw = (data ?? []) as unknown as EcueReprise[]
+  }
 
   // Grouper par niveau d'origine
   const reprisesByNiveau: Record<string, { niveauNom: string; ecues: EcueReprise[] }> = {}
-  ecuesReprisesMap.forEach((e) => {
+  ecuesReprisesRaw.forEach((e) => {
     const key = e.niveau_id
     const niveauNom = e.niveaux?.nom ?? 'Autre niveau'
     if (!reprisesByNiveau[key]) reprisesByNiveau[key] = { niveauNom, ecues: [] }
     reprisesByNiveau[key]!.ecues.push(e)
   })
-  // Trier les ECUEs dans chaque groupe
-  Object.values(reprisesByNiveau).forEach(g => g.ecues.sort((a, b) => a.code.localeCompare(b.code)))
 
   const typesPresents: NoteType[] = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage', 'reprise']
 
