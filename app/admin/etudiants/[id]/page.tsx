@@ -1,0 +1,161 @@
+import { createAdminClient } from '@/lib/supabase/admin'
+import { unstable_noStore as noStore } from 'next/cache'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
+
+const NOTE_LABELS: Record<string, string> = {
+  CC1: 'CC 1', CC2: 'CC 2', CC3: 'CC 3',
+  ET: 'Exam. Terminal', rattrapage: 'Rattrapage', reprise: 'Reprise',
+}
+const TYPES_ORDER = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage', 'reprise']
+
+function noteColor(v: number | null) {
+  if (v === null) return 'text-gray-300'
+  if (v >= 12) return 'text-green-600 font-semibold'
+  if (v >= 10) return 'text-amber-600 font-semibold'
+  return 'text-red-500 font-semibold'
+}
+
+export default async function EtudiantRecapPage({ params }: { params: Promise<{ id: string }> }) {
+  noStore()
+  const { id } = await params
+  const supabase = createAdminClient()
+
+  const { data: etudiant } = await supabase
+    .from('etudiants')
+    .select('id, nom, prenom, matricule, email, telephone, niveau_id, niveaux(nom, code)')
+    .eq('id', id)
+    .single()
+
+  if (!etudiant) notFound()
+
+  const { data: annee } = await supabase
+    .from('annees_academiques')
+    .select('id, libelle')
+    .eq('active', true)
+    .single()
+
+  type EcueRow = { id: string; code: string; nom: string; coefficient: number; niveau_id: string; niveaux: { nom: string; code: string } | null }
+
+  const { data: ecuesRaw } = await supabase
+    .from('ecues')
+    .select('id, code, nom, coefficient, niveau_id, niveaux(nom, code)')
+    .order('code')
+
+  const ecues = (ecuesRaw ?? []) as unknown as EcueRow[]
+
+  const { data: notes } = await supabase
+    .from('notes')
+    .select('ecue_id, type, valeur')
+    .eq('etudiant_id', id)
+    .eq('annee_academique_id', annee?.id ?? '')
+
+  const notesIndex = new Map<string, number | null>()
+  notes?.forEach(n => notesIndex.set(`${n.ecue_id}-${n.type}`, n.valeur))
+
+  // ECUEs ayant au moins une note pour cet étudiant
+  const ecueIdsAvecNotes = new Set(notes?.map(n => n.ecue_id) ?? [])
+  const ecuesAvecNotes = ecues.filter(e => ecueIdsAvecNotes.has(e.id))
+
+  // Grouper par niveau
+  const parNiveau: Record<string, { niveauNom: string; ecues: EcueRow[] }> = {}
+  ecuesAvecNotes.forEach(e => {
+    const key = e.niveau_id
+    if (!parNiveau[key]) parNiveau[key] = { niveauNom: e.niveaux?.nom ?? 'Niveau inconnu', ecues: [] }
+    parNiveau[key]!.ecues.push(e)
+  })
+
+  const niveauxOrdonnes = Object.entries(parNiveau).sort(([, a], [, b]) => a.niveauNom.localeCompare(b.niveauNom))
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Link href="/admin/etudiants" className="text-xs text-blue-600 hover:text-blue-800">← Retour à la liste</Link>
+          <h1 className="text-xl font-bold text-gray-900 mt-1">{etudiant.prenom} {etudiant.nom}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {annee ? `Année académique ${annee.libelle}` : ''}
+          </p>
+        </div>
+      </div>
+
+      {/* Infos étudiant */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-wrap gap-6 text-sm">
+        <div>
+          <span className="text-gray-400 text-xs">Matricule</span>
+          <p className="font-medium text-gray-900">{etudiant.matricule}</p>
+        </div>
+        <div>
+          <span className="text-gray-400 text-xs">Email</span>
+          <p className="font-medium text-gray-900">{etudiant.email}</p>
+        </div>
+        <div>
+          <span className="text-gray-400 text-xs">Téléphone</span>
+          <p className="font-medium text-gray-900">{etudiant.telephone ?? '—'}</p>
+        </div>
+        <div>
+          <span className="text-gray-400 text-xs">Niveau actuel</span>
+          <p className="font-medium text-gray-900">
+            {(etudiant.niveaux as unknown as { nom: string } | null)?.nom ?? 'N/A'}
+          </p>
+        </div>
+      </div>
+
+      {/* Tableaux de notes par niveau */}
+      {niveauxOrdonnes.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+          <p className="text-gray-400">Aucune note enregistrée pour cet étudiant.</p>
+        </div>
+      ) : (
+        niveauxOrdonnes.map(([niveauId, { niveauNom, ecues: ecuesNiveau }]) => {
+          const isNiveauActuel = niveauId === etudiant.niveau_id
+          const typesPresents = TYPES_ORDER.filter(t =>
+            ecuesNiveau.some(e => notesIndex.get(`${e.id}-${t}`) !== undefined && notesIndex.get(`${e.id}-${t}`) !== null)
+          )
+          return (
+            <div key={niveauId} className={`bg-white rounded-xl border overflow-hidden ${isNiveauActuel ? 'border-gray-100' : 'border-orange-100'}`}>
+              <div className={`px-4 py-3 border-b flex items-center gap-2 ${isNiveauActuel ? 'bg-gray-50 border-gray-100' : 'bg-orange-50 border-orange-100'}`}>
+                <span className={`text-sm font-semibold ${isNiveauActuel ? 'text-gray-700' : 'text-orange-500'}`}>{niveauNom}</span>
+                {!isNiveauActuel && <span className="text-orange-400 text-xs">— reprise</span>}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
+                      <th className="text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
+                      {typesPresents.map(t => (
+                        <th key={t} className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">{NOTE_LABELS[t]}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {ecuesNiveau.map(e => (
+                      <tr key={e.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-gray-800">{e.nom}</p>
+                          <p className="text-xs text-gray-400">{e.code}</p>
+                        </td>
+                        <td className="text-center px-2 py-3 text-gray-500">{e.coefficient}</td>
+                        {typesPresents.map(t => {
+                          const v = notesIndex.get(`${e.id}-${t}`) ?? null
+                          return (
+                            <td key={t} className="text-center px-3 py-3">
+                              <span className={noteColor(v)}>{v !== null ? v.toFixed(2) : '—'}</span>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}

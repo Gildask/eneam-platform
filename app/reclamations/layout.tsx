@@ -9,9 +9,11 @@ export default async function ReclamationsLayout({ children }: { children: React
 
   const { data: etudiant } = await supabase
     .from('etudiants')
-    .select('nom, prenom')
+    .select('nom, prenom, password_changed')
     .eq('id', user.id)
     .single()
+
+  if (etudiant && etudiant.password_changed === false) redirect('/change-password')
 
   return (
     <StudentShell etudiant={etudiant} activePath="/reclamations">

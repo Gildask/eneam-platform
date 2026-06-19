@@ -11,9 +11,11 @@ export default async function StudentLayout({ children }: { children: React.Reac
 
   const { data: etudiant } = await supabase
     .from('etudiants')
-    .select('nom, prenom, matricule, niveaux(nom)')
+    .select('nom, prenom, matricule, password_changed, niveaux(nom)')
     .eq('id', user.id)
     .single()
+
+  if (etudiant && etudiant.password_changed === false) redirect('/change-password')
 
   return (
     <div className="min-h-screen bg-gray-50">

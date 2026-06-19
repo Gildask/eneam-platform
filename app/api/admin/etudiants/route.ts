@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 const ADMIN_EMAIL = 'gildaskodonon3@gmail.com'
@@ -17,11 +18,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Tous les champs obligatoires doivent être remplis.' }, { status: 400 })
   }
 
-  // Créer le compte Auth avec email = matricule@eneam.bj, mot de passe = matricule par défaut
-  const authEmail = `${matricule.trim().toLowerCase()}@eneam.bj`
+  const adminClient = createAdminClient()
+  const authEmail = email.trim().toLowerCase()
   const defaultPassword = matricule.trim()
 
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email: authEmail,
     password: defaultPassword,
     email_confirm: true,
@@ -31,8 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: authError?.message ?? 'Erreur création compte.' }, { status: 400 })
   }
 
-  // Insérer dans la table etudiants
-  const { error: dbError } = await supabase.from('etudiants').insert({
+  const { error: dbError } = await adminClient.from('etudiants').insert({
     id: authData.user.id,
     matricule: matricule.trim().toUpperCase(),
     nom: nom.trim().toUpperCase(),
@@ -43,8 +43,7 @@ export async function POST(request: Request) {
   })
 
   if (dbError) {
-    // Supprimer le compte auth si l'insertion échoue
-    await supabase.auth.admin.deleteUser(authData.user.id)
+    await adminClient.auth.admin.deleteUser(authData.user.id)
     return NextResponse.json({ error: dbError.message }, { status: 400 })
   }
 

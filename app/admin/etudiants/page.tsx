@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import AddEtudiantForm from './AddEtudiantForm'
 
 type EtudiantRow = {
@@ -43,6 +44,7 @@ export default async function EtudiantsPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Email</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Niveau</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Téléphone</th>
+                <th className="text-center px-4 py-3 font-medium text-gray-500">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -55,6 +57,11 @@ export default async function EtudiantsPage() {
                     {e.niveaux?.nom ?? '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{e.telephone ?? '—'}</td>
+                  <td className="px-4 py-3 text-center">
+                    <Link href={`/admin/etudiants/${e.id}`} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                      Voir les notes
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

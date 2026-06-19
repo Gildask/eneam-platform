@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [matricule, setMatricule] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,18 +18,33 @@ export default function LoginPage() {
 
     const supabase = createClient()
 
-    // On utilise le matricule comme email : matricule@eneam.bj
-    const email = `${matricule.trim().toLowerCase()}@eneam.bj`
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    })
 
     if (error) {
-      setError('Matricule ou mot de passe incorrect.')
+      setError('Email ou mot de passe incorrect.')
       setLoading(false)
       return
     }
 
-    router.push('/notes')
+    const { data: { user } } = await supabase.auth.getUser()
+    const isAdmin = user?.email === 'gildaskodonon3@gmail.com'
+
+    if (isAdmin) {
+      router.push('/admin')
+      router.refresh()
+      return
+    }
+
+    const { data: etudiant } = await supabase
+      .from('etudiants')
+      .select('password_changed')
+      .eq('id', user!.id)
+      .single()
+
+    router.push(etudiant?.password_changed === false ? '/change-password' : '/notes')
     router.refresh()
   }
 
@@ -53,15 +68,15 @@ export default function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="matricule" className="block text-sm font-medium text-gray-700 mb-1">
-                Matricule
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Email
               </label>
               <input
-                id="matricule"
-                type="text"
-                value={matricule}
-                onChange={(e) => setMatricule(e.target.value)}
-                placeholder="Ex: DECOGEF2024001"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="exemple@email.com"
                 required
                 className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               />
