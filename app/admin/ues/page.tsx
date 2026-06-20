@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import AddUeForm from './AddUeForm'
 import UeActions from './UeActions'
+import AttachEcuesPanel from './AttachEcuesPanel'
 
 type UeRow = {
   id: string
@@ -63,11 +64,12 @@ export default async function UesPage() {
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
-              {items.map((u) => {
-                const ecuesRattachees = ecues.filter(e => e.ue_id === u.id)
-                return (
-                  <tr key={u.id} className="hover:bg-gray-50">
+            {items.map((u) => {
+              const ecuesNiveau = ecues.filter(e => e.niveau_id === u.niveau_id)
+              const ecuesRattachees = ecuesNiveau.filter(e => e.ue_id === u.id)
+              return (
+                <tbody key={u.id} className="divide-y divide-gray-50">
+                  <tr className="hover:bg-gray-50">
                     <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{u.code}</td>
                     <td className="px-4 py-2.5 text-gray-800">{u.nom}</td>
                     <td className="px-4 py-2.5 text-center text-gray-500">{u.credits ?? '—'}</td>
@@ -78,9 +80,14 @@ export default async function UesPage() {
                     </td>
                     <UeActions ue={u} />
                   </tr>
-                )
-              })}
-            </tbody>
+                  <tr>
+                    <td colSpan={5} className="p-0">
+                      <AttachEcuesPanel ueId={u.id} ecuesNiveau={ecuesNiveau} />
+                    </td>
+                  </tr>
+                </tbody>
+              )
+            })}
           </table>
         </div>
       ))}
