@@ -9,6 +9,7 @@ type Props = {
 
 const NAV = [
   { href: '/notes', label: 'Mes notes' },
+  { href: '/recapitulatif', label: 'Récapitulatif' },
   { href: '/documents', label: 'Mes documents' },
   { href: '/reclamations', label: 'Réclamations' },
 ]

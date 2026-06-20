@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import StudentShell from '@/components/StudentShell'
 
-export default async function NotesLayout({ children }: { children: React.ReactNode }) {
+export default async function RecapitulatifLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -16,7 +16,7 @@ export default async function NotesLayout({ children }: { children: React.ReactN
   if (etudiant && etudiant.password_changed === false) redirect('/change-password')
 
   return (
-    <StudentShell etudiant={etudiant} activePath="/notes">
+    <StudentShell etudiant={etudiant} activePath="/recapitulatif">
       {children}
     </StudentShell>
   )

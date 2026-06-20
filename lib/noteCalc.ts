@@ -38,3 +38,19 @@ export function moyenneUE(ecues: { noteFinale: number | null; coefficient: numbe
   if (totalCoef === 0) return null
   return valides.reduce((a, e) => a + e.noteFinale * e.coefficient, 0) / totalCoef
 }
+
+export const SEUIL_VALIDATION = 10
+
+export function estValide(moyenne: number | null): boolean | null {
+  if (moyenne === null) return null
+  return moyenne >= SEUIL_VALIDATION
+}
+
+/** Moyenne pondérée générique (ex: UE -> semestre par crédits, semestre -> année par crédits). Poids null/0 traité comme 1. */
+export function moyennePonderee(items: { moyenne: number | null; poids: number | null }[]): number | null {
+  const valides = items.filter((i): i is { moyenne: number; poids: number | null } => i.moyenne !== null)
+  if (valides.length === 0) return null
+  const totalPoids = valides.reduce((a, i) => a + (i.poids || 1), 0)
+  if (totalPoids === 0) return null
+  return valides.reduce((a, i) => a + i.moyenne * (i.poids || 1), 0) / totalPoids
+}
