@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
-import { noteFinaleEcueDetail, moyenneUE, moyennePonderee, estValide } from '@/lib/noteCalc'
+import { calculerResultatsNiveau, moyennePonderee, estValide, SEUIL_VALIDATION_UE } from '@/lib/noteCalc'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,22 +57,9 @@ export default async function RecapitulatifPage() {
   const notesIndex = new Map<string, number | null>()
   notes?.forEach(n => notesIndex.set(`${n.ecue_id}-${n.type}`, n.valeur))
 
-  // Moyenne par UE
-  const moyennesUe = new Map<string, number | null>()
-  ues.forEach(ue => {
-    const ecuesUe = ecues.filter(e => e.ue_id === ue.id)
-    const items = ecuesUe.map(e => {
-      const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
-        CC1: notesIndex.get(`${e.id}-CC1`) ?? null,
-        CC2: notesIndex.get(`${e.id}-CC2`) ?? null,
-        CC3: notesIndex.get(`${e.id}-CC3`) ?? null,
-        ET: notesIndex.get(`${e.id}-ET`) ?? null,
-        rattrapage: notesIndex.get(`${e.id}-rattrapage`) ?? null,
-      })
-      return { noteFinale, coefficient: e.coefficient, rattrapageUtilise }
-    })
-    moyennesUe.set(ue.id, moyenneUE(items))
-  })
+  const { moyennesUe, moyennesSemestre, moyenneAnnuelle: moyenneAnnuelleNiveau } = calculerResultatsNiveau(
+    semestres, ues, ecues, notesIndex
+  )
 
   // Regrouper les UE par semestre (les UE sans semestre vont dans un groupe "Hors semestre")
   const semestresAffiches: (SemestreRow | { id: '__none__'; code: ''; nom: 'Hors semestre'; ordre: 999 })[] = [
@@ -82,20 +69,15 @@ export default async function RecapitulatifPage() {
     semestresAffiches.push({ id: '__none__', code: '', nom: 'Hors semestre', ordre: 999 })
   }
 
-  const recapSemestres = semestresAffiches.map(sem => {
+  const recapSemestres = semestresAffiches.map((sem, i) => {
     const uesSemestre = ues.filter(u => (u.semestre_id ?? '__none__') === sem.id)
-    const moyenneSemestre = moyennePonderee(
-      uesSemestre.map(u => ({ moyenne: moyennesUe.get(u.id) ?? null, poids: u.credits }))
-    )
+    const moyenneSemestre = sem.id === '__none__'
+      ? moyennePonderee(uesSemestre.map(u => ({ moyenne: moyennesUe.get(u.id) ?? null, poids: u.credits })))
+      : moyennesSemestre[i] ?? null
     return { semestre: sem, uesSemestre, moyenneSemestre }
   })
 
-  const moyenneAnnuelle = moyennePonderee(
-    recapSemestres.map(r => ({
-      moyenne: r.moyenneSemestre,
-      poids: r.uesSemestre.reduce((a, u) => a + (u.credits ?? 1), 0),
-    }))
-  )
+  const moyenneAnnuelle = moyenneAnnuelleNiveau
 
   return (
     <div className="space-y-6">
@@ -153,7 +135,7 @@ export default async function RecapitulatifPage() {
                     <td className="text-center px-4 py-2.5">
                       <span className={noteColor(moy)}>{moy !== null ? moy.toFixed(2) : '—'}</span>
                     </td>
-                    <td className="text-center px-4 py-2.5"><StatutBadge valide={estValide(moy)} /></td>
+                    <td className="text-center px-4 py-2.5"><StatutBadge valide={estValide(moy, SEUIL_VALIDATION_UE)} /></td>
                   </tr>
                 )
               })}

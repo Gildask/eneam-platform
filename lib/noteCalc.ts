@@ -52,10 +52,11 @@ export function moyenneUE(ecues: { noteFinale: number | null; coefficient: numbe
 }
 
 export const SEUIL_VALIDATION = 10
+export const SEUIL_VALIDATION_UE = 12
 
-export function estValide(moyenne: number | null): boolean | null {
+export function estValide(moyenne: number | null, seuil: number = SEUIL_VALIDATION): boolean | null {
   if (moyenne === null) return null
-  return moyenne >= SEUIL_VALIDATION
+  return moyenne >= seuil
 }
 
 /** Moyenne pondérée générique (ex: UE -> semestre par crédits, semestre -> année par crédits). Poids null/0 traité comme 1. */
@@ -86,6 +87,12 @@ export type EcueDef = { id: string; coefficient: number; ue_id: string | null }
  * les moyennes par UE, par semestre (pondérées par crédits UE) et la moyenne annuelle
  * (pondérée par le total des crédits de chaque semestre), à partir de la structure
  * semestres/UE/ECUE d'un niveau.
+ *
+ * Une UE est validée à partir de 12/20 (SEUIL_VALIDATION_UE). Par compensation,
+ * si la moyenne annuelle brute (avant rachat) atteint au moins 12/20, toute UE
+ * dont la moyenne brute est comprise entre 10 et 12 est automatiquement rachetée
+ * à 12/20. Les moyennes de semestre et annuelle finales sont recalculées avec
+ * les UE rachetées.
  */
 export function calculerResultatsNiveau(
   semestres: SemestreDef[],
@@ -93,36 +100,59 @@ export function calculerResultatsNiveau(
   ecues: EcueDef[],
   notesIndex: Map<string, number | null>
 ) {
+  const calculerMoyennesUe = () => {
+    const moyennes = new Map<string, number | null>()
+    ues.forEach(ue => {
+      const ecuesUe = ecues.filter(e => e.ue_id === ue.id)
+      const items = ecuesUe.map(e => {
+        const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
+          CC1: notesIndex.get(`${e.id}-CC1`) ?? null,
+          CC2: notesIndex.get(`${e.id}-CC2`) ?? null,
+          CC3: notesIndex.get(`${e.id}-CC3`) ?? null,
+          ET: notesIndex.get(`${e.id}-ET`) ?? null,
+          rattrapage: notesIndex.get(`${e.id}-rattrapage`) ?? null,
+        })
+        return { noteFinale, coefficient: e.coefficient, rattrapageUtilise }
+      })
+      moyennes.set(ue.id, moyenneUE(items))
+    })
+    return moyennes
+  }
+
+  const calculerAgregats = (moyennesUe: Map<string, number | null>) => {
+    const moyennesSemestre = semestres.map(sem => {
+      const uesSemestre = ues.filter(u => u.semestre_id === sem.id)
+      return moyennePonderee(uesSemestre.map(u => ({ moyenne: moyennesUe.get(u.id) ?? null, poids: u.credits })))
+    })
+    const creditsParSemestre = semestres.map(sem =>
+      ues.filter(u => u.semestre_id === sem.id).reduce((a, u) => a + (u.credits ?? 1), 0)
+    )
+    const moyenneAnnuelle = moyennePonderee(
+      semestres.map((_, i) => ({ moyenne: moyennesSemestre[i] ?? null, poids: creditsParSemestre[i] }))
+    )
+    return { moyennesSemestre, creditsParSemestre, moyenneAnnuelle }
+  }
+
+  // Passe 1 : moyennes UE et moyenne annuelle brutes (sans rachat)
+  const moyennesUeBrutes = calculerMoyennesUe()
+  const { moyenneAnnuelle: moyenneAnnuelleBrute } = calculerAgregats(moyennesUeBrutes)
+
+  // Passe 2 : rachat des UE entre 10 et 12 si la moyenne annuelle brute atteint 12
+  const rachatActif = moyenneAnnuelleBrute !== null && moyenneAnnuelleBrute >= SEUIL_VALIDATION_UE
+  const ueRachetees = new Set<string>()
   const moyennesUe = new Map<string, number | null>()
   ues.forEach(ue => {
-    const ecuesUe = ecues.filter(e => e.ue_id === ue.id)
-    const items = ecuesUe.map(e => {
-      const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
-        CC1: notesIndex.get(`${e.id}-CC1`) ?? null,
-        CC2: notesIndex.get(`${e.id}-CC2`) ?? null,
-        CC3: notesIndex.get(`${e.id}-CC3`) ?? null,
-        ET: notesIndex.get(`${e.id}-ET`) ?? null,
-        rattrapage: notesIndex.get(`${e.id}-rattrapage`) ?? null,
-      })
-      return { noteFinale, coefficient: e.coefficient, rattrapageUtilise }
-    })
-    moyennesUe.set(ue.id, moyenneUE(items))
+    const brute = moyennesUeBrutes.get(ue.id) ?? null
+    if (rachatActif && brute !== null && brute >= SEUIL_VALIDATION && brute < SEUIL_VALIDATION_UE) {
+      moyennesUe.set(ue.id, SEUIL_VALIDATION_UE)
+      ueRachetees.add(ue.id)
+    } else {
+      moyennesUe.set(ue.id, brute)
+    }
   })
 
-  const moyennesSemestre = semestres.map(sem => {
-    const uesSemestre = ues.filter(u => u.semestre_id === sem.id)
-    return moyennePonderee(uesSemestre.map(u => ({ moyenne: moyennesUe.get(u.id) ?? null, poids: u.credits })))
-  })
-
-  const creditsParSemestre = semestres.map(sem =>
-    ues.filter(u => u.semestre_id === sem.id).reduce((a, u) => a + (u.credits ?? 1), 0)
-  )
-
-  const moyenneAnnuelle = moyennePonderee(
-    semestres.map((_, i) => ({ moyenne: moyennesSemestre[i] ?? null, poids: creditsParSemestre[i] }))
-  )
-
+  const { moyennesSemestre, creditsParSemestre, moyenneAnnuelle } = calculerAgregats(moyennesUe)
   const creditsTotal = creditsParSemestre.reduce((a, c) => a + c, 0)
 
-  return { moyennesUe, moyennesSemestre, moyenneAnnuelle, creditsTotal }
+  return { moyennesUe, moyennesSemestre, moyenneAnnuelle, creditsTotal, ueRachetees }
 }

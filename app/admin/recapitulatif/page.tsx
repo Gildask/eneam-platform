@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
-import { noteFinaleEcueDetail, moyenneUE, moyennePonderee, estValide } from '@/lib/noteCalc'
+import { calculerResultatsNiveau, estValide } from '@/lib/noteCalc'
 import { fetchAllNotes } from '@/lib/fetchAllNotes'
 
 export const dynamic = 'force-dynamic'
@@ -71,35 +71,7 @@ export default async function AdminRecapitulatifPage({
 
     lignes = etudiants.map(etudiant => {
       const notesIndex = notesParEtudiant.get(etudiant.id) ?? new Map()
-
-      const moyennesUe = new Map<string, number | null>()
-      ues.forEach(ue => {
-        const ecuesUe = ecues.filter(e => e.ue_id === ue.id)
-        const items = ecuesUe.map(e => {
-          const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
-            CC1: notesIndex.get(`${e.id}-CC1`) ?? null,
-            CC2: notesIndex.get(`${e.id}-CC2`) ?? null,
-            CC3: notesIndex.get(`${e.id}-CC3`) ?? null,
-            ET: notesIndex.get(`${e.id}-ET`) ?? null,
-            rattrapage: notesIndex.get(`${e.id}-rattrapage`) ?? null,
-          })
-          return { noteFinale, coefficient: e.coefficient, rattrapageUtilise }
-        })
-        moyennesUe.set(ue.id, moyenneUE(items))
-      })
-
-      const moyennesSemestre = semestres.map(sem => {
-        const uesSemestre = ues.filter(u => u.semestre_id === sem.id)
-        return moyennePonderee(uesSemestre.map(u => ({ moyenne: moyennesUe.get(u.id) ?? null, poids: u.credits })))
-      })
-
-      const moyenneAnnuelle = moyennePonderee(
-        semestres.map((sem, i) => ({
-          moyenne: moyennesSemestre[i] ?? null,
-          poids: ues.filter(u => u.semestre_id === sem.id).reduce((a, u) => a + (u.credits ?? 1), 0),
-        }))
-      )
-
+      const { moyennesSemestre, moyenneAnnuelle } = calculerResultatsNiveau(semestres, ues, ecues, notesIndex)
       return { etudiant, moyennesSemestre, moyenneAnnuelle }
     }).sort((a, b) => (b.moyenneAnnuelle ?? -1) - (a.moyenneAnnuelle ?? -1))
   }

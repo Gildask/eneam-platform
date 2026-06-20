@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import type { NoteType } from '@/lib/types'
-import { noteFinaleEcueDetail, moyenneUE } from '@/lib/noteCalc'
+import { noteFinaleEcueDetail, calculerResultatsNiveau, type SemestreDef, type UeDef } from '@/lib/noteCalc'
 import RefreshButton from './RefreshButton'
 
 export const dynamic = 'force-dynamic'
@@ -42,10 +42,11 @@ type EcueAffichage = {
   ues: { code: string; nom: string } | null
 }
 
-function NotesTable({ ecues, notesIndex, typesPresents }: {
+function NotesTable({ ecues, notesIndex, typesPresents, moyennesUeMap }: {
   ecues: EcueAffichage[]
   notesIndex: Map<string, number | null>
   typesPresents: NoteType[]
+  moyennesUeMap: Map<string, number | null>
 }) {
   // Regrouper par UE (les ECUEs sans UE restent affichées directement, sans moyenne de groupe)
   const groupes: { ue: { code: string; nom: string } | null; items: EcueAffichage[] }[] = []
@@ -95,8 +96,9 @@ function NotesTable({ ecues, notesIndex, typesPresents }: {
               return { ecue, noteFinale, rattrapageUtilise }
             })
 
-            const moyUE = groupe.ue
-              ? moyenneUE(ecuesAvecNoteFinale.map(({ ecue, noteFinale, rattrapageUtilise }) => ({ noteFinale, coefficient: ecue.coefficient, rattrapageUtilise })))
+            const ueId = groupe.items[0]?.ue_id ?? null
+            const moyUE = groupe.ue && ueId
+              ? moyennesUeMap.get(ueId) ?? null
               : null
 
             return (
@@ -195,6 +197,18 @@ export default async function NotesPage() {
   const notesIndex = new Map<string, number | null>()
   notes?.forEach(n => notesIndex.set(`${n.ecue_id}-${n.type}`, n.valeur))
 
+  // Structure semestres/UE du niveau actuel, pour le calcul de la moyenne UE avec rachat
+  const [{ data: semestresNiveauRaw }, { data: uesNiveauRaw }] = await Promise.all([
+    supabase.from('semestres').select('id').eq('niveau_id', etudiant?.niveau_id ?? ''),
+    supabase.from('ues').select('id, credits, semestre_id').eq('niveau_id', etudiant?.niveau_id ?? ''),
+  ])
+  const { moyennesUe: moyennesUeNiveau } = calculerResultatsNiveau(
+    (semestresNiveauRaw ?? []) as SemestreDef[],
+    (uesNiveauRaw ?? []) as UeDef[],
+    ecuesNiveau,
+    notesIndex
+  )
+
   // Reprises : admin client pour récupérer toutes les notes hors niveau actuel
   const supabaseAdmin = createAdminClient()
   const ecueIdsNiveau = new Set(ecuesNiveau.map(e => e.id))
@@ -230,6 +244,25 @@ export default async function NotesPage() {
     if (!reprisesByNiveau[key]) reprisesByNiveau[key] = { niveauNom, ecues: [] }
     reprisesByNiveau[key]!.ecues.push(e)
   })
+
+  // Moyennes UE (avec rachat) pour chaque niveau de reprise
+  const moyennesUeParNiveauReprise = new Map<string, Map<string, number | null>>()
+  await Promise.all(
+    Object.keys(reprisesByNiveau).map(async (repriseNiveauId) => {
+      const [{ data: semestresRepriseRaw }, { data: uesRepriseRaw }, { data: ecuesRepriseToutesRaw }] = await Promise.all([
+        supabaseAdmin.from('semestres').select('id').eq('niveau_id', repriseNiveauId),
+        supabaseAdmin.from('ues').select('id, credits, semestre_id').eq('niveau_id', repriseNiveauId),
+        supabaseAdmin.from('ecues').select('id, coefficient, ue_id').eq('niveau_id', repriseNiveauId),
+      ])
+      const { moyennesUe } = calculerResultatsNiveau(
+        (semestresRepriseRaw ?? []) as SemestreDef[],
+        (uesRepriseRaw ?? []) as UeDef[],
+        ecuesRepriseToutesRaw ?? [],
+        notesIndex
+      )
+      moyennesUeParNiveauReprise.set(repriseNiveauId, moyennesUe)
+    })
+  )
 
   const typesPresentsNiveau: NoteType[] = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage']
   const typesPresents: NoteType[] = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage', 'reprise']
@@ -270,7 +303,7 @@ export default async function NotesPage() {
       {/* Tableau des notes du niveau actuel */}
       {ecuesNiveau.length > 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <NotesTable ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresentsNiveau} />
+          <NotesTable ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresentsNiveau} moyennesUeMap={moyennesUeNiveau} />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
@@ -293,7 +326,7 @@ export default async function NotesPage() {
               <span className="text-orange-500 text-sm font-semibold">Reprises</span>
               <span className="text-orange-400 text-xs">— matières de {niveauNom}</span>
             </div>
-            <NotesTable ecues={ecues} notesIndex={notesIndex} typesPresents={typesReprise} />
+            <NotesTable ecues={ecues} notesIndex={notesIndex} typesPresents={typesReprise} moyennesUeMap={moyennesUeParNiveauReprise.get(niveauId) ?? new Map()} />
           </div>
         )
       })}

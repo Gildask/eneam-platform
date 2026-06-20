@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_noStore as noStore } from 'next/cache'
 import { notFound } from 'next/navigation'
-import { calculerResultatsNiveau, mention, estValide } from '@/lib/noteCalc'
+import { calculerResultatsNiveau, mention, estValide, SEUIL_VALIDATION_UE } from '@/lib/noteCalc'
 import PrintButton from './PrintButton'
 
 export const dynamic = 'force-dynamic'
@@ -91,7 +91,7 @@ export default async function RelevePage({ params }: { params: Promise<{ id: str
                           <td className="text-center py-1.5 text-gray-600">{ue.credits ?? '—'}</td>
                           <td className="text-center py-1.5 font-semibold text-gray-800">{moyUe !== null ? moyUe.toFixed(2) : '—'}</td>
                           <td className="text-center py-1.5 font-semibold">
-                            {estValide(moyUe) === null ? '—' : estValide(moyUe) ? 'V' : 'NV'}
+                            {estValide(moyUe, SEUIL_VALIDATION_UE) === null ? '—' : estValide(moyUe, SEUIL_VALIDATION_UE) ? 'V' : 'NV'}
                           </td>
                         </tr>
                         {ecuesUe.map(e => (

@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_noStore as noStore } from 'next/cache'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { noteFinaleEcueDetail, moyenneUE } from '@/lib/noteCalc'
+import { noteFinaleEcueDetail, calculerResultatsNiveau, type SemestreDef, type UeDef, type EcueDef } from '@/lib/noteCalc'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,10 +30,11 @@ type EcueRow = {
   ues: { code: string; nom: string } | null
 }
 
-function TableNotes({ ecues, notesIndex, typesPresents }: {
+function TableNotes({ ecues, notesIndex, typesPresents, moyennesUeMap }: {
   ecues: EcueRow[]
   notesIndex: Map<string, number | null>
   typesPresents: string[]
+  moyennesUeMap: Map<string, number | null>
 }) {
   const groupes: { ue: { code: string; nom: string } | null; items: EcueRow[] }[] = []
   const indexParUe = new Map<string, number>()
@@ -73,9 +74,8 @@ function TableNotes({ ecues, notesIndex, typesPresents }: {
           })
           return { ecue, noteFinale, rattrapageUtilise }
         })
-        const moyUE = groupe.ue
-          ? moyenneUE(items.map(({ ecue, noteFinale, rattrapageUtilise }) => ({ noteFinale, coefficient: ecue.coefficient, rattrapageUtilise })))
-          : null
+        const ueId = groupe.items[0]?.ue_id ?? null
+        const moyUE = groupe.ue && ueId ? moyennesUeMap.get(ueId) ?? null : null
 
         return (
           <tbody key={gIdx} className="divide-y divide-gray-50">
@@ -147,12 +147,15 @@ export default async function EtudiantRecapPage({ params }: { params: Promise<{ 
     .eq('active', true)
     .single()
 
-  const { data: ecuesRaw } = await supabase
-    .from('ecues')
-    .select('id, code, nom, coefficient, niveau_id, ue_id, niveaux(nom, code), ues(code, nom)')
-    .order('code')
+  const [{ data: ecuesRaw }, { data: semestresRaw }, { data: uesRaw }] = await Promise.all([
+    supabase.from('ecues').select('id, code, nom, coefficient, niveau_id, ue_id, niveaux(nom, code), ues(code, nom)').order('code'),
+    supabase.from('semestres').select('id, niveau_id'),
+    supabase.from('ues').select('id, credits, semestre_id, niveau_id'),
+  ])
 
   const ecues = (ecuesRaw ?? []) as unknown as EcueRow[]
+  const semestresTous = (semestresRaw ?? []) as (SemestreDef & { niveau_id: string })[]
+  const uesTous = (uesRaw ?? []) as (UeDef & { niveau_id: string })[]
 
   const { data: notes } = await supabase
     .from('notes')
@@ -176,6 +179,16 @@ export default async function EtudiantRecapPage({ params }: { params: Promise<{ 
   })
 
   const niveauxOrdonnes = Object.entries(parNiveau).sort(([, a], [, b]) => a.niveauNom.localeCompare(b.niveauNom))
+
+  // Moyennes UE (avec rachat) par niveau, calculées sur la structure complète de chaque niveau
+  const moyennesUeParNiveau = new Map<string, Map<string, number | null>>()
+  niveauxOrdonnes.forEach(([niveauId]) => {
+    const semestresNiveau = semestresTous.filter(s => s.niveau_id === niveauId)
+    const uesNiveau = uesTous.filter(u => u.niveau_id === niveauId)
+    const ecuesNiveauToutes = ecues.filter(e => e.niveau_id === niveauId) as EcueDef[]
+    const { moyennesUe } = calculerResultatsNiveau(semestresNiveau, uesNiveau, ecuesNiveauToutes, notesIndex)
+    moyennesUeParNiveau.set(niveauId, moyennesUe)
+  })
 
   return (
     <div className="space-y-6">
@@ -235,7 +248,7 @@ export default async function EtudiantRecapPage({ params }: { params: Promise<{ 
                 {!isNiveauActuel && <span className="text-orange-400 text-xs">— reprise</span>}
               </div>
               <div className="overflow-x-auto">
-                <TableNotes ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresents} />
+                <TableNotes ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresents} moyennesUeMap={moyennesUeParNiveau.get(niveauId) ?? new Map()} />
               </div>
             </div>
           )

@@ -1,7 +1,7 @@
 import { Fragment } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
-import { noteFinaleEcueDetail, moyenneUE, estValide } from '@/lib/noteCalc'
+import { noteFinaleEcueDetail, estValide, calculerResultatsNiveau, SEUIL_VALIDATION_UE, type SemestreDef, type UeDef, type EcueDef } from '@/lib/noteCalc'
 import { fetchAllNotes } from '@/lib/fetchAllNotes'
 import PrintButton from './PrintButton'
 
@@ -82,8 +82,15 @@ export default async function RecapitulatifSemestrePage({
 
     const creditsTotal = uesSemestre.reduce((a, u) => a + (u.credits ?? 1), 0)
 
+    const semestreIdx = semestresNiveau.findIndex(s => s.id === semestre_id)
+
     lignes = etudiants.map(etudiant => {
       const notesIndex = notesParEtudiant.get(etudiant.id) ?? new Map()
+
+      // Moyennes UE avec rachat, calculées sur l'ensemble des semestres du niveau
+      const { moyennesUe, moyennesSemestre } = calculerResultatsNiveau(
+        semestresNiveau as SemestreDef[], ues as UeDef[], ecues as EcueDef[], notesIndex
+      )
 
       const ues_: LigneUe[] = uesSemestre.map(ue => {
         const matieres: LigneMatiere[] = (ecuesParUe.get(ue.id) ?? []).map(ecue => {
@@ -97,17 +104,14 @@ export default async function RecapitulatifSemestrePage({
           return { ecue, note: noteFinale, rattrapageUtilise }
         })
 
-        const moyenne = moyenneUE(matieres.map(m => ({ noteFinale: m.note, coefficient: m.ecue.coefficient, rattrapageUtilise: m.rattrapageUtilise })))
-        return { ue, matieres, moyenne, valide: estValide(moyenne) }
+        const moyenne = moyennesUe.get(ue.id) ?? null
+        return { ue, matieres, moyenne, valide: estValide(moyenne, SEUIL_VALIDATION_UE) }
       })
 
       const creditsObtenus = ues_.reduce((a, u) => a + (u.valide ? (u.ue.credits ?? 1) : 0), 0)
       const nbUeValidees = ues_.filter(u => u.valide).length
 
-      const validesPourMoyenne = ues_.filter(u => u.moyenne !== null)
-      const totalCoefMoy = validesPourMoyenne.reduce((a, u) => a + (u.ue.credits ?? 1), 0)
-      const moyenneGenerale = totalCoefMoy === 0 ? null
-        : validesPourMoyenne.reduce((a, u) => a + (u.moyenne ?? 0) * (u.ue.credits ?? 1), 0) / totalCoefMoy
+      const moyenneGenerale = semestreIdx >= 0 ? moyennesSemestre[semestreIdx] ?? null : null
 
       const aUneReprise = ues_.some(u => u.matieres.some(m => m.rattrapageUtilise))
 
