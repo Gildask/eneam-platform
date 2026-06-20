@@ -187,6 +187,12 @@ export default async function EtudiantRecapPage({ params }: { params: Promise<{ 
             {annee ? `Année académique ${annee.libelle}` : ''}
           </p>
         </div>
+        <Link
+          href={`/admin/etudiants/${etudiant.id}/releve`}
+          className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+        >
+          Relevé de notes
+        </Link>
       </div>
 
       {/* Infos étudiant */}

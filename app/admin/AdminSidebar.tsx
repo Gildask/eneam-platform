@@ -11,6 +11,7 @@ const SECTIONS = [
       { href: '/admin', label: 'Tableau de bord' },
       { href: '/admin/notes', label: 'Notes' },
       { href: '/admin/recapitulatif', label: 'Récapitulatif (PV)' },
+      { href: '/admin/recapitulatif-cycle', label: 'Récapitulatif de cycle' },
       { href: '/admin/etudiants', label: 'Étudiants' },
       { href: '/admin/reprises', label: 'Reprises' },
     ],
@@ -53,7 +54,7 @@ export default function AdminSidebar() {
 
   function isActive(href: string) {
     if (href === '/admin') return pathname === '/admin'
-    return pathname?.startsWith(href)
+    return pathname === href || pathname?.startsWith(href + '/')
   }
 
   return (

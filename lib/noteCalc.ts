@@ -54,3 +54,63 @@ export function moyennePonderee(items: { moyenne: number | null; poids: number |
   if (totalPoids === 0) return null
   return valides.reduce((a, i) => a + i.moyenne * (i.poids || 1), 0) / totalPoids
 }
+
+/** Mention académique standard à partir d'une moyenne sur 20. */
+export function mention(moyenne: number | null): string | null {
+  if (moyenne === null) return null
+  if (moyenne < SEUIL_VALIDATION) return null
+  if (moyenne >= 16) return 'Très Bien'
+  if (moyenne >= 14) return 'Bien'
+  if (moyenne >= 12) return 'Assez Bien'
+  return 'Passable'
+}
+
+export type SemestreDef = { id: string }
+export type UeDef = { id: string; credits: number | null; semestre_id: string | null }
+export type EcueDef = { id: string; coefficient: number; ue_id: string | null }
+
+/**
+ * Calcule, pour un étudiant donné (via son notesIndex "ecueId-type" -> valeur),
+ * les moyennes par UE, par semestre (pondérées par crédits UE) et la moyenne annuelle
+ * (pondérée par le total des crédits de chaque semestre), à partir de la structure
+ * semestres/UE/ECUE d'un niveau.
+ */
+export function calculerResultatsNiveau(
+  semestres: SemestreDef[],
+  ues: UeDef[],
+  ecues: EcueDef[],
+  notesIndex: Map<string, number | null>
+) {
+  const moyennesUe = new Map<string, number | null>()
+  ues.forEach(ue => {
+    const ecuesUe = ecues.filter(e => e.ue_id === ue.id)
+    const items = ecuesUe.map(e => ({
+      noteFinale: noteFinaleEcue({
+        CC1: notesIndex.get(`${e.id}-CC1`) ?? null,
+        CC2: notesIndex.get(`${e.id}-CC2`) ?? null,
+        CC3: notesIndex.get(`${e.id}-CC3`) ?? null,
+        ET: notesIndex.get(`${e.id}-ET`) ?? null,
+        rattrapage: notesIndex.get(`${e.id}-rattrapage`) ?? null,
+      }),
+      coefficient: e.coefficient,
+    }))
+    moyennesUe.set(ue.id, moyenneUE(items))
+  })
+
+  const moyennesSemestre = semestres.map(sem => {
+    const uesSemestre = ues.filter(u => u.semestre_id === sem.id)
+    return moyennePonderee(uesSemestre.map(u => ({ moyenne: moyennesUe.get(u.id) ?? null, poids: u.credits })))
+  })
+
+  const creditsParSemestre = semestres.map(sem =>
+    ues.filter(u => u.semestre_id === sem.id).reduce((a, u) => a + (u.credits ?? 1), 0)
+  )
+
+  const moyenneAnnuelle = moyennePonderee(
+    semestres.map((_, i) => ({ moyenne: moyennesSemestre[i] ?? null, poids: creditsParSemestre[i] }))
+  )
+
+  const creditsTotal = creditsParSemestre.reduce((a, c) => a + c, 0)
+
+  return { moyennesUe, moyennesSemestre, moyenneAnnuelle, creditsTotal }
+}
