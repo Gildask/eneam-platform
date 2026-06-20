@@ -231,6 +231,7 @@ export default async function NotesPage() {
     reprisesByNiveau[key]!.ecues.push(e)
   })
 
+  const typesPresentsNiveau: NoteType[] = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage']
   const typesPresents: NoteType[] = ['CC1', 'CC2', 'CC3', 'ET', 'rattrapage', 'reprise']
 
   return (
@@ -269,7 +270,7 @@ export default async function NotesPage() {
       {/* Tableau des notes du niveau actuel */}
       {ecuesNiveau.length > 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <NotesTable ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresents} />
+          <NotesTable ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresentsNiveau} />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
