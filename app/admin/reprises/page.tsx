@@ -44,13 +44,25 @@ export default async function ReprisesPage() {
     ecues: { nom: string; code: string; niveau_id: string } | null
   }
 
-  const { data: notesRaw } = await supabase
-    .from('notes')
-    .select('id, valeur, type, etudiant_id, ecue_id, etudiants(nom, prenom, matricule, niveau_id), ecues(nom, code, niveau_id)')
-    .eq('annee_academique_id', annee?.id ?? '')
-    .range(0, 19999)
+  // Supabase plafonne à 1000 lignes par requête : pagination manuelle nécessaire
+  let notesRaw: unknown[] = []
+  {
+    const PAGE_SIZE = 1000
+    let from = 0
+    while (true) {
+      const { data } = await supabase
+        .from('notes')
+        .select('id, valeur, type, etudiant_id, ecue_id, etudiants(nom, prenom, matricule, niveau_id), ecues(nom, code, niveau_id)')
+        .eq('annee_academique_id', annee?.id ?? '')
+        .range(from, from + PAGE_SIZE - 1)
+      if (!data) break
+      notesRaw = notesRaw.concat(data)
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+  }
 
-  const notes = (notesRaw ?? []) as unknown as NoteRow[]
+  const notes = notesRaw as unknown as NoteRow[]
 
   const reprises = notes.filter(n => {
     const etudiantNiveau = n.etudiants?.niveau_id

@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { noteFinaleEcueDetail, moyenneUE, estValide } from '@/lib/noteCalc'
+import { fetchAllNotes } from '@/lib/fetchAllNotes'
 import PrintButton from './PrintButton'
 
 export const dynamic = 'force-dynamic'
@@ -69,15 +70,11 @@ export default async function RecapitulatifSemestrePage({
       ecuesParUe.set(ue.id, ecues.filter(e => e.ue_id === ue.id).sort((a, b) => a.code.localeCompare(b.code)))
     })
 
-    const { data: notesRaw } = await supabase
-      .from('notes')
-      .select('etudiant_id, ecue_id, type, valeur')
-      .eq('annee_academique_id', annee?.id ?? '')
-      .range(0, 19999)
+    const notesRaw = await fetchAllNotes(supabase, annee?.id ?? '')
 
     const etudiantIds = new Set(etudiants.map(e => e.id))
     const notesParEtudiant = new Map<string, Map<string, number | null>>()
-    notesRaw?.forEach(n => {
+    notesRaw.forEach(n => {
       if (!etudiantIds.has(n.etudiant_id)) return
       if (!notesParEtudiant.has(n.etudiant_id)) notesParEtudiant.set(n.etudiant_id, new Map())
       notesParEtudiant.get(n.etudiant_id)!.set(`${n.ecue_id}-${n.type}`, n.valeur)

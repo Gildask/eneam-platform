@@ -2,6 +2,7 @@ import { Fragment } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { calculerResultatsNiveau, estValide, type SemestreDef, type UeDef, type EcueDef } from '@/lib/noteCalc'
+import { fetchAllNotes } from '@/lib/fetchAllNotes'
 import PrintButton from '../recapitulatif-semestre/PrintButton'
 
 export const dynamic = 'force-dynamic'
@@ -37,12 +38,12 @@ export default async function RecapitulatifAnnuelPage({
   let ues: UeRow[] = []
 
   if (niveau_id) {
-    const [{ data: semestresRaw }, { data: uesRaw }, { data: ecuesRaw }, { data: etudiantsRaw }, { data: notesRaw }] = await Promise.all([
+    const [{ data: semestresRaw }, { data: uesRaw }, { data: ecuesRaw }, { data: etudiantsRaw }, notesRaw] = await Promise.all([
       supabase.from('semestres').select('id, code, nom, ordre').eq('niveau_id', niveau_id).order('ordre'),
       supabase.from('ues').select('id, code, nom, credits, semestre_id').eq('niveau_id', niveau_id),
       supabase.from('ecues').select('id, coefficient, ue_id').eq('niveau_id', niveau_id),
       supabase.from('etudiants').select('id, matricule, nom, prenom').eq('niveau_id', niveau_id).order('nom'),
-      supabase.from('notes').select('etudiant_id, ecue_id, type, valeur').eq('annee_academique_id', annee?.id ?? '').range(0, 19999),
+      fetchAllNotes(supabase, annee?.id ?? ''),
     ])
 
     semestres = (semestresRaw ?? []) as SemestreRow[]

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { noteFinaleEcueDetail, moyenneUE, moyennePonderee, estValide } from '@/lib/noteCalc'
+import { fetchAllNotes } from '@/lib/fetchAllNotes'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,19 +47,19 @@ export default async function AdminRecapitulatifPage({
   let semestres: SemestreRow[] = []
 
   if (niveau_id) {
-    const [{ data: semestresRaw }, { data: uesRaw }, { data: ecuesRaw }, { data: etudiantsRaw }, { data: notesRaw }] = await Promise.all([
+    const [{ data: semestresRaw }, { data: uesRaw }, { data: ecuesRaw }, { data: etudiantsRaw }, notesRaw] = await Promise.all([
       supabase.from('semestres').select('id, code, nom, ordre').eq('niveau_id', niveau_id).order('ordre'),
       supabase.from('ues').select('id, credits, semestre_id').eq('niveau_id', niveau_id),
       supabase.from('ecues').select('id, coefficient, ue_id').eq('niveau_id', niveau_id),
       supabase.from('etudiants').select('id, matricule, nom, prenom').eq('niveau_id', niveau_id).order('nom'),
-      supabase.from('notes').select('etudiant_id, ecue_id, type, valeur').eq('annee_academique_id', annee?.id ?? '').range(0, 19999),
+      fetchAllNotes(supabase, annee?.id ?? ''),
     ])
 
     semestres = (semestresRaw ?? []) as SemestreRow[]
     const ues = (uesRaw ?? []) as UeRow[]
     const ecues = (ecuesRaw ?? []) as EcueRow[]
     const etudiants = (etudiantsRaw ?? []) as Etudiant[]
-    const notes = notesRaw ?? []
+    const notes = notesRaw
 
     const etudiantIds = new Set(etudiants.map(e => e.id))
     const notesParEtudiant = new Map<string, Map<string, number | null>>()

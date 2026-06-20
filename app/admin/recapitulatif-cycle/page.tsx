@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { calculerResultatsNiveau, moyennePonderee, estValide, mention, type SemestreDef, type UeDef, type EcueDef } from '@/lib/noteCalc'
+import { fetchAllNotes } from '@/lib/fetchAllNotes'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,14 +70,10 @@ export default async function RecapitulatifCyclePage({
         })
       )
 
-      const { data: notesRaw } = await supabase
-        .from('notes')
-        .select('etudiant_id, ecue_id, type, valeur')
-        .eq('annee_academique_id', annee?.id ?? '')
-        .range(0, 19999)
+      const notesRaw = await fetchAllNotes(supabase, annee?.id ?? '')
 
       const notesParEtudiant = new Map<string, Map<string, number | null>>()
-      notesRaw?.forEach(n => {
+      notesRaw.forEach(n => {
         if (!notesParEtudiant.has(n.etudiant_id)) notesParEtudiant.set(n.etudiant_id, new Map())
         notesParEtudiant.get(n.etudiant_id)!.set(`${n.ecue_id}-${n.type}`, n.valeur)
       })

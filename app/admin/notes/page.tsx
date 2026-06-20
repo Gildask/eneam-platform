@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_noStore as noStore } from 'next/cache'
+import { fetchAllNotes } from '@/lib/fetchAllNotes'
 import NotesForm from './NotesForm'
 
 export const dynamic = 'force-dynamic'
@@ -20,11 +21,7 @@ export default async function AdminNotesPage() {
     supabase.from('annees_academiques').select('id, libelle').eq('active', true).single(),
   ])
 
-  const { data: notes } = await supabase
-    .from('notes')
-    .select('etudiant_id, ecue_id, type, valeur')
-    .eq('annee_academique_id', annee?.id ?? '')
-    .range(0, 19999)
+  const notes = await fetchAllNotes(supabase, annee?.id ?? '')
 
   return (
     <div className="space-y-6">
@@ -40,7 +37,7 @@ export default async function AdminNotesPage() {
           niveaux={niveaux ?? []}
           etudiants={etudiants ?? []}
           ecues={ecues ?? []}
-          notesExistantes={notes ?? []}
+          notesExistantes={notes}
         />
       </div>
     </div>
