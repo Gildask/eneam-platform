@@ -73,6 +73,7 @@ export default async function RecapitulatifSemestrePage({
       .from('notes')
       .select('etudiant_id, ecue_id, type, valeur')
       .eq('annee_academique_id', annee?.id ?? '')
+      .range(0, 19999)
 
     const etudiantIds = new Set(etudiants.map(e => e.id))
     const notesParEtudiant = new Map<string, Map<string, number | null>>()

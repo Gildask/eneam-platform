@@ -42,7 +42,7 @@ export default async function RecapitulatifAnnuelPage({
       supabase.from('ues').select('id, code, nom, credits, semestre_id').eq('niveau_id', niveau_id),
       supabase.from('ecues').select('id, coefficient, ue_id').eq('niveau_id', niveau_id),
       supabase.from('etudiants').select('id, matricule, nom, prenom').eq('niveau_id', niveau_id).order('nom'),
-      supabase.from('notes').select('etudiant_id, ecue_id, type, valeur').eq('annee_academique_id', annee?.id ?? ''),
+      supabase.from('notes').select('etudiant_id, ecue_id, type, valeur').eq('annee_academique_id', annee?.id ?? '').range(0, 19999),
     ])
 
     semestres = (semestresRaw ?? []) as SemestreRow[]

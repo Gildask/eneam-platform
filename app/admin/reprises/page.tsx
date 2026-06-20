@@ -48,6 +48,7 @@ export default async function ReprisesPage() {
     .from('notes')
     .select('id, valeur, type, etudiant_id, ecue_id, etudiants(nom, prenom, matricule, niveau_id), ecues(nom, code, niveau_id)')
     .eq('annee_academique_id', annee?.id ?? '')
+    .range(0, 19999)
 
   const notes = (notesRaw ?? []) as unknown as NoteRow[]
 

@@ -24,6 +24,7 @@ export default async function AdminNotesPage() {
     .from('notes')
     .select('etudiant_id, ecue_id, type, valeur')
     .eq('annee_academique_id', annee?.id ?? '')
+    .range(0, 19999)
 
   return (
     <div className="space-y-6">
