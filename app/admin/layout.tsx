@@ -14,10 +14,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-blue-700 text-white sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between overflow-x-auto">
           <div className="flex items-center gap-6">
-            <span className="font-bold text-sm">ENEAM Admin</span>
-            <div className="flex gap-4 text-sm">
+            <span className="font-bold text-sm whitespace-nowrap">ENEAM Admin</span>
+            <div className="flex gap-4 text-sm whitespace-nowrap">
               <Link href="/admin" className="text-blue-100 hover:text-white transition-colors">
                 Tableau de bord
               </Link>
@@ -35,6 +35,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               </Link>
               <Link href="/admin/ecues" className="text-blue-100 hover:text-white transition-colors">
                 Matières (ECUEs)
+              </Link>
+              <Link href="/admin/enseignants" className="text-blue-100 hover:text-white transition-colors">
+                Enseignants
+              </Link>
+              <Link href="/admin/salles" className="text-blue-100 hover:text-white transition-colors">
+                Salles
+              </Link>
+              <Link href="/admin/cours" className="text-blue-100 hover:text-white transition-colors">
+                Cours
+              </Link>
+              <Link href="/admin/emargement" className="text-blue-100 hover:text-white transition-colors">
+                Émargement
               </Link>
               <Link href="/admin/documents" className="text-blue-100 hover:text-white transition-colors">
                 Documents
