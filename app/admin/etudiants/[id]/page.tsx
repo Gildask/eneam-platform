@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_noStore as noStore } from 'next/cache'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { noteFinaleEcue, moyenneUE } from '@/lib/noteCalc'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,115 @@ function noteColor(v: number | null) {
   if (v >= 12) return 'text-green-600 font-semibold'
   if (v >= 10) return 'text-amber-600 font-semibold'
   return 'text-red-500 font-semibold'
+}
+
+type EcueRow = {
+  id: string
+  code: string
+  nom: string
+  coefficient: number
+  niveau_id: string
+  ue_id: string | null
+  niveaux: { nom: string; code: string } | null
+  ues: { code: string; nom: string } | null
+}
+
+function TableNotes({ ecues, notesIndex, typesPresents }: {
+  ecues: EcueRow[]
+  notesIndex: Map<string, number | null>
+  typesPresents: string[]
+}) {
+  const groupes: { ue: { code: string; nom: string } | null; items: EcueRow[] }[] = []
+  const indexParUe = new Map<string, number>()
+  ecues.forEach(e => {
+    const key = e.ue_id ?? '__none__'
+    if (!indexParUe.has(key)) {
+      indexParUe.set(key, groupes.length)
+      groupes.push({ ue: e.ue_id ? e.ues : null, items: [] })
+    }
+    groupes[indexParUe.get(key)!]!.items.push(e)
+  })
+
+  const showFinale = typesPresents.includes('rattrapage') || typesPresents.includes('ET')
+
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-gray-100">
+          <th className="text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
+          <th className="text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
+          {typesPresents.map(t => (
+            <th key={t} className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">{NOTE_LABELS[t]}</th>
+          ))}
+          {showFinale && (
+            <th className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">Note finale</th>
+          )}
+        </tr>
+      </thead>
+      {groupes.map((groupe, gIdx) => {
+        const items = groupe.items.map(ecue => ({
+          ecue,
+          noteFinale: noteFinaleEcue({
+            CC1: notesIndex.get(`${ecue.id}-CC1`) ?? null,
+            CC2: notesIndex.get(`${ecue.id}-CC2`) ?? null,
+            CC3: notesIndex.get(`${ecue.id}-CC3`) ?? null,
+            ET: notesIndex.get(`${ecue.id}-ET`) ?? null,
+            rattrapage: notesIndex.get(`${ecue.id}-rattrapage`) ?? null,
+          }),
+        }))
+        const moyUE = groupe.ue
+          ? moyenneUE(items.map(({ ecue, noteFinale }) => ({ noteFinale, coefficient: ecue.coefficient })))
+          : null
+
+        return (
+          <tbody key={gIdx} className="divide-y divide-gray-50">
+            {groupe.ue && (
+              <tr className="bg-gray-50">
+                <td colSpan={2 + typesPresents.length + (showFinale ? 1 : 0)} className="px-4 py-2 text-xs font-semibold text-gray-600">
+                  {groupe.ue.code} — {groupe.ue.nom}
+                </td>
+              </tr>
+            )}
+            {items.map(({ ecue, noteFinale }) => (
+              <tr key={ecue.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  <p className="font-medium text-gray-800">{ecue.nom}</p>
+                  <p className="text-xs text-gray-400">{ecue.code}</p>
+                </td>
+                <td className="text-center px-2 py-3 text-gray-500">{ecue.coefficient}</td>
+                {typesPresents.map(t => {
+                  const v = notesIndex.get(`${ecue.id}-${t}`) ?? null
+                  return (
+                    <td key={t} className="text-center px-3 py-3">
+                      <span className={noteColor(v)}>{v !== null ? v.toFixed(2) : '—'}</span>
+                    </td>
+                  )
+                })}
+                {showFinale && (
+                  <td className="text-center px-3 py-3">
+                    <span className={noteColor(noteFinale)}>{noteFinale !== null ? noteFinale.toFixed(2) : '—'}</span>
+                  </td>
+                )}
+              </tr>
+            ))}
+            {groupe.ue && (
+              <tr className="bg-blue-50/50">
+                <td colSpan={1 + typesPresents.length} className="px-4 py-2 text-xs font-semibold text-blue-700 text-right">
+                  Moyenne UE
+                </td>
+                <td className="text-center px-2 py-2"></td>
+                <td className="text-center px-3 py-2">
+                  <span className={`text-xs font-bold ${noteColor(moyUE)}`}>
+                    {moyUE !== null ? moyUE.toFixed(2) : '—'}
+                  </span>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        )
+      })}
+    </table>
+  )
 }
 
 export default async function EtudiantRecapPage({ params }: { params: Promise<{ id: string }> }) {
@@ -37,11 +147,9 @@ export default async function EtudiantRecapPage({ params }: { params: Promise<{ 
     .eq('active', true)
     .single()
 
-  type EcueRow = { id: string; code: string; nom: string; coefficient: number; niveau_id: string; niveaux: { nom: string; code: string } | null }
-
   const { data: ecuesRaw } = await supabase
     .from('ecues')
-    .select('id, code, nom, coefficient, niveau_id, niveaux(nom, code)')
+    .select('id, code, nom, coefficient, niveau_id, ue_id, niveaux(nom, code), ues(code, nom)')
     .order('code')
 
   const ecues = (ecuesRaw ?? []) as unknown as EcueRow[]
@@ -121,36 +229,7 @@ export default async function EtudiantRecapPage({ params }: { params: Promise<{ 
                 {!isNiveauActuel && <span className="text-orange-400 text-xs">— reprise</span>}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100">
-                      <th className="text-left px-4 py-3 font-medium text-gray-500 w-1/3">Matière (ECUE)</th>
-                      <th className="text-center px-2 py-3 font-medium text-gray-500">Coef.</th>
-                      {typesPresents.map(t => (
-                        <th key={t} className="text-center px-3 py-3 font-medium text-gray-500 whitespace-nowrap">{NOTE_LABELS[t]}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {ecuesNiveau.map(e => (
-                      <tr key={e.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-gray-800">{e.nom}</p>
-                          <p className="text-xs text-gray-400">{e.code}</p>
-                        </td>
-                        <td className="text-center px-2 py-3 text-gray-500">{e.coefficient}</td>
-                        {typesPresents.map(t => {
-                          const v = notesIndex.get(`${e.id}-${t}`) ?? null
-                          return (
-                            <td key={t} className="text-center px-3 py-3">
-                              <span className={noteColor(v)}>{v !== null ? v.toFixed(2) : '—'}</span>
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <TableNotes ecues={ecuesNiveau} notesIndex={notesIndex} typesPresents={typesPresents} />
               </div>
             </div>
           )
