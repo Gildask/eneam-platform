@@ -30,6 +30,11 @@ export function noteFinaleEcue(n: NotesParEcue): number | null {
   return cc * 0.4 + examen * 0.6
 }
 
+/** Comme noteFinaleEcue, mais indique aussi si la note de rattrapage a été utilisée dans le calcul. */
+export function noteFinaleEcueDetail(n: NotesParEcue): { noteFinale: number | null; rattrapageUtilise: boolean } {
+  return { noteFinale: noteFinaleEcue(n), rattrapageUtilise: n.rattrapage !== null }
+}
+
 /** Moyenne pondérée par coefficient des notes finales d'ECUE d'une UE. */
 export function moyenneUE(ecues: { noteFinale: number | null; coefficient: number }[]): number | null {
   const valides = ecues.filter((e): e is { noteFinale: number; coefficient: number } => e.noteFinale !== null)
