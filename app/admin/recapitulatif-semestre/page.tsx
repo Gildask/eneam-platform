@@ -120,7 +120,7 @@ export default async function RecapitulatifSemestrePage({
       lignes = lignes.filter(l => l.ues.some(u => u.valide === false))
     }
 
-    lignes.sort((a, b) => (b.moyenneGenerale ?? -1) - (a.moyenneGenerale ?? -1))
+    lignes.sort((a, b) => a.etudiant.nom.localeCompare(b.etudiant.nom) || a.etudiant.prenom.localeCompare(b.etudiant.prenom))
   }
 
   const niveauActuel = niveaux.find(n => n.id === niveau_id)
@@ -138,6 +138,16 @@ export default async function RecapitulatifSemestrePage({
 
   return (
     <div className="space-y-6">
+      <style>{`
+        @media print {
+          @page { size: A4 landscape; margin: 8mm; }
+          table { font-size: 7px; }
+          th, td { padding: 1px 3px !important; }
+          thead { display: table-header-group; }
+          tr { page-break-inside: avoid; }
+        }
+      `}</style>
+
       <div className="flex items-center justify-between print:hidden">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Récapitulatif du semestre</h1>
@@ -213,11 +223,11 @@ export default async function RecapitulatifSemestrePage({
               <span className="text-xs text-gray-400">{lignes.length} étudiant(s)</span>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto print:overflow-visible">
               <table className="text-xs border-collapse w-full">
                 <thead>
                   <tr>
-                    <th rowSpan={2} className="sticky left-0 z-10 bg-blue-100 border border-blue-200 px-2 py-1.5 text-left min-w-[160px]">
+                    <th rowSpan={2} className="sticky left-0 z-10 bg-blue-100 border border-blue-200 px-2 py-1.5 text-left min-w-[160px] print:static">
                       Semestre : {semestreActuel?.code}
                     </th>
                     {uesSemestre.map(ue => (
@@ -250,7 +260,7 @@ export default async function RecapitulatifSemestrePage({
                 <tbody>
                   {lignes.map((ligne, idx) => (
                     <tr key={ligne.etudiant.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="sticky left-0 z-10 bg-inherit border border-gray-200 px-2 py-1.5 whitespace-nowrap">
+                      <td className="sticky left-0 z-10 bg-inherit border border-gray-200 px-2 py-1.5 whitespace-nowrap print:static">
                         <span className="text-gray-400">{ligne.etudiant.matricule}</span>{' '}
                         <strong>{ligne.etudiant.nom}</strong> {ligne.etudiant.prenom}
                       </td>

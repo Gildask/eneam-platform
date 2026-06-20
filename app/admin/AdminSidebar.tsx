@@ -12,6 +12,7 @@ const SECTIONS = [
       { href: '/admin/notes', label: 'Notes' },
       { href: '/admin/recapitulatif', label: 'Récapitulatif (PV)' },
       { href: '/admin/recapitulatif-semestre', label: 'Récap. par semestre' },
+      { href: '/admin/recapitulatif-annuel', label: 'Récap. annuel' },
       { href: '/admin/recapitulatif-cycle', label: 'Récapitulatif de cycle' },
       { href: '/admin/etudiants', label: 'Étudiants' },
       { href: '/admin/reprises', label: 'Reprises' },
