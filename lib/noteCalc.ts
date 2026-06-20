@@ -16,18 +16,19 @@ export function moyenneCC(n: NotesParEcue): number | null {
 }
 
 /**
- * Note finale d'une ECUE = 40% moyenne CC + 60% (ET ou Rattrapage plafonné à 12).
+ * Note finale d'une ECUE = 25% moyenne CC + 75% (ET ou Rattrapage, non plafonné ici).
+ * Le plafond de 12 lié au rattrapage s'applique à la moyenne de l'UE, pas à cette note.
  * Retourne null si aucune donnée exploitable (ni CC ni ET ni rattrapage).
  */
 export function noteFinaleEcue(n: NotesParEcue): number | null {
   const cc = moyenneCC(n)
-  const examen = n.rattrapage !== null ? Math.min(n.rattrapage, RATTRAPAGE_MAX) : n.ET
+  const examen = n.rattrapage !== null ? n.rattrapage : n.ET
 
   if (cc === null && examen === null) return null
   if (cc === null) return examen
   if (examen === null) return cc
 
-  return cc * 0.4 + examen * 0.6
+  return cc * 0.25 + examen * 0.75
 }
 
 /** Comme noteFinaleEcue, mais indique aussi si la note de rattrapage a été utilisée dans le calcul. */
@@ -35,13 +36,19 @@ export function noteFinaleEcueDetail(n: NotesParEcue): { noteFinale: number | nu
   return { noteFinale: noteFinaleEcue(n), rattrapageUtilise: n.rattrapage !== null }
 }
 
-/** Moyenne pondérée par coefficient des notes finales d'ECUE d'une UE. */
-export function moyenneUE(ecues: { noteFinale: number | null; coefficient: number }[]): number | null {
-  const valides = ecues.filter((e): e is { noteFinale: number; coefficient: number } => e.noteFinale !== null)
+/**
+ * Moyenne pondérée par coefficient des notes finales d'ECUE d'une UE.
+ * Si au moins une ECUE de l'UE a été retenue via une note de rattrapage,
+ * la moyenne de l'UE est plafonnée à 12/20 (le rattrapage lui-même n'est pas plafonné).
+ */
+export function moyenneUE(ecues: { noteFinale: number | null; coefficient: number; rattrapageUtilise?: boolean }[]): number | null {
+  const valides = ecues.filter((e): e is { noteFinale: number; coefficient: number; rattrapageUtilise?: boolean } => e.noteFinale !== null)
   if (valides.length === 0) return null
   const totalCoef = valides.reduce((a, e) => a + e.coefficient, 0)
   if (totalCoef === 0) return null
-  return valides.reduce((a, e) => a + e.noteFinale * e.coefficient, 0) / totalCoef
+  const moyenne = valides.reduce((a, e) => a + e.noteFinale * e.coefficient, 0) / totalCoef
+  const aRattrapage = valides.some(e => e.rattrapageUtilise)
+  return aRattrapage ? Math.min(moyenne, RATTRAPAGE_MAX) : moyenne
 }
 
 export const SEUIL_VALIDATION = 10
@@ -89,16 +96,16 @@ export function calculerResultatsNiveau(
   const moyennesUe = new Map<string, number | null>()
   ues.forEach(ue => {
     const ecuesUe = ecues.filter(e => e.ue_id === ue.id)
-    const items = ecuesUe.map(e => ({
-      noteFinale: noteFinaleEcue({
+    const items = ecuesUe.map(e => {
+      const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
         CC1: notesIndex.get(`${e.id}-CC1`) ?? null,
         CC2: notesIndex.get(`${e.id}-CC2`) ?? null,
         CC3: notesIndex.get(`${e.id}-CC3`) ?? null,
         ET: notesIndex.get(`${e.id}-ET`) ?? null,
         rattrapage: notesIndex.get(`${e.id}-rattrapage`) ?? null,
-      }),
-      coefficient: e.coefficient,
-    }))
+      })
+      return { noteFinale, coefficient: e.coefficient, rattrapageUtilise }
+    })
     moyennesUe.set(ue.id, moyenneUE(items))
   })
 

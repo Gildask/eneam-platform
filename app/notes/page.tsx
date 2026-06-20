@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import type { NoteType } from '@/lib/types'
-import { noteFinaleEcue, moyenneUE } from '@/lib/noteCalc'
+import { noteFinaleEcueDetail, moyenneUE } from '@/lib/noteCalc'
 import RefreshButton from './RefreshButton'
 
 export const dynamic = 'force-dynamic'
@@ -84,19 +84,19 @@ function NotesTable({ ecues, notesIndex, typesPresents }: {
           </tr>
         </thead>
           {groupes.map((groupe, gIdx) => {
-            const ecuesAvecNoteFinale = groupe.items.map(ecue => ({
-              ecue,
-              noteFinale: noteFinaleEcue({
+            const ecuesAvecNoteFinale = groupe.items.map(ecue => {
+              const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
                 CC1: notesIndex.get(`${ecue.id}-CC1`) ?? null,
                 CC2: notesIndex.get(`${ecue.id}-CC2`) ?? null,
                 CC3: notesIndex.get(`${ecue.id}-CC3`) ?? null,
                 ET: notesIndex.get(`${ecue.id}-ET`) ?? null,
                 rattrapage: notesIndex.get(`${ecue.id}-rattrapage`) ?? null,
-              }),
-            }))
+              })
+              return { ecue, noteFinale, rattrapageUtilise }
+            })
 
             const moyUE = groupe.ue
-              ? moyenneUE(ecuesAvecNoteFinale.map(({ ecue, noteFinale }) => ({ noteFinale, coefficient: ecue.coefficient })))
+              ? moyenneUE(ecuesAvecNoteFinale.map(({ ecue, noteFinale, rattrapageUtilise }) => ({ noteFinale, coefficient: ecue.coefficient, rattrapageUtilise })))
               : null
 
             return (

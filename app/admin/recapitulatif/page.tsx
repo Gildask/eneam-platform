@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
-import { noteFinaleEcue, moyenneUE, moyennePonderee, estValide } from '@/lib/noteCalc'
+import { noteFinaleEcueDetail, moyenneUE, moyennePonderee, estValide } from '@/lib/noteCalc'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,16 +74,16 @@ export default async function AdminRecapitulatifPage({
       const moyennesUe = new Map<string, number | null>()
       ues.forEach(ue => {
         const ecuesUe = ecues.filter(e => e.ue_id === ue.id)
-        const items = ecuesUe.map(e => ({
-          noteFinale: noteFinaleEcue({
+        const items = ecuesUe.map(e => {
+          const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
             CC1: notesIndex.get(`${e.id}-CC1`) ?? null,
             CC2: notesIndex.get(`${e.id}-CC2`) ?? null,
             CC3: notesIndex.get(`${e.id}-CC3`) ?? null,
             ET: notesIndex.get(`${e.id}-ET`) ?? null,
             rattrapage: notesIndex.get(`${e.id}-rattrapage`) ?? null,
-          }),
-          coefficient: e.coefficient,
-        }))
+          })
+          return { noteFinale, coefficient: e.coefficient, rattrapageUtilise }
+        })
         moyennesUe.set(ue.id, moyenneUE(items))
       })
 

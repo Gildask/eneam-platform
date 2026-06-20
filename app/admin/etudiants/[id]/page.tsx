@@ -2,7 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { unstable_noStore as noStore } from 'next/cache'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { noteFinaleEcue, moyenneUE } from '@/lib/noteCalc'
+import { noteFinaleEcueDetail, moyenneUE } from '@/lib/noteCalc'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,18 +63,18 @@ function TableNotes({ ecues, notesIndex, typesPresents }: {
         </tr>
       </thead>
       {groupes.map((groupe, gIdx) => {
-        const items = groupe.items.map(ecue => ({
-          ecue,
-          noteFinale: noteFinaleEcue({
+        const items = groupe.items.map(ecue => {
+          const { noteFinale, rattrapageUtilise } = noteFinaleEcueDetail({
             CC1: notesIndex.get(`${ecue.id}-CC1`) ?? null,
             CC2: notesIndex.get(`${ecue.id}-CC2`) ?? null,
             CC3: notesIndex.get(`${ecue.id}-CC3`) ?? null,
             ET: notesIndex.get(`${ecue.id}-ET`) ?? null,
             rattrapage: notesIndex.get(`${ecue.id}-rattrapage`) ?? null,
-          }),
-        }))
+          })
+          return { ecue, noteFinale, rattrapageUtilise }
+        })
         const moyUE = groupe.ue
-          ? moyenneUE(items.map(({ ecue, noteFinale }) => ({ noteFinale, coefficient: ecue.coefficient })))
+          ? moyenneUE(items.map(({ ecue, noteFinale, rattrapageUtilise }) => ({ noteFinale, coefficient: ecue.coefficient, rattrapageUtilise })))
           : null
 
         return (

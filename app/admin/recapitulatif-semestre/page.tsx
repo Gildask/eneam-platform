@@ -99,7 +99,7 @@ export default async function RecapitulatifSemestrePage({
           return { ecue, note: noteFinale, rattrapageUtilise }
         })
 
-        const moyenne = moyenneUE(matieres.map(m => ({ noteFinale: m.note, coefficient: m.ecue.coefficient })) as { noteFinale: number | null; coefficient: number }[])
+        const moyenne = moyenneUE(matieres.map(m => ({ noteFinale: m.note, coefficient: m.ecue.coefficient, rattrapageUtilise: m.rattrapageUtilise })))
         return { ue, matieres, moyenne, valide: estValide(moyenne) }
       })
 
