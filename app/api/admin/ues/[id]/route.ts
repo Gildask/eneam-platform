@@ -15,17 +15,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!supabase) return NextResponse.json({ error: 'Non autorisé.' }, { status: 403 })
 
   const { id } = await params
-  const { code, nom, coefficient, credits, google_sheet_name, ue_id } = await request.json()
+  const { code, nom, credits } = await request.json()
 
   if (!nom) return NextResponse.json({ error: 'Le nom est obligatoire.' }, { status: 400 })
 
-  const { error } = await supabase.from('ecues').update({
+  const { error } = await supabase.from('ues').update({
     code: String(code).trim().toUpperCase(),
     nom: String(nom).trim(),
-    coefficient: parseFloat(coefficient) || 1,
-    credits: parseInt(credits) || 1,
-    google_sheet_name: google_sheet_name?.trim() || null,
-    ue_id: ue_id || null,
+    credits: credits ? parseInt(credits) : null,
   }).eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
@@ -37,7 +34,11 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!supabase) return NextResponse.json({ error: 'Non autorisé.' }, { status: 403 })
 
   const { id } = await params
-  const { error } = await supabase.from('ecues').delete().eq('id', id)
+
+  // Détacher les ECUEs rattachées avant suppression
+  await supabase.from('ecues').update({ ue_id: null }).eq('ue_id', id)
+
+  const { error } = await supabase.from('ues').delete().eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ success: true })

@@ -3,33 +3,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type Ecue = {
-  id: string
-  code: string
-  nom: string
-  coefficient: number
-  credits: number
-  google_sheet_name: string | null
-  ue_id: string | null
-}
+type Ue = { id: string; code: string; nom: string; credits: number | null }
 
-type Ue = { id: string; code: string; nom: string }
-
-export default function EcueActions({ ecue, ues }: { ecue: Ecue; ues: Ue[] }) {
+export default function UeActions({ ue }: { ue: Ue }) {
   const router = useRouter()
   const [mode, setMode] = useState<'idle' | 'edit' | 'confirm-delete'>('idle')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    code: ecue.code,
-    nom: ecue.nom,
-    coefficient: String(ecue.coefficient),
-    credits: String(ecue.credits),
-    google_sheet_name: ecue.google_sheet_name ?? '',
-    ue_id: ecue.ue_id ?? '',
+    code: ue.code,
+    nom: ue.nom,
+    credits: ue.credits !== null ? String(ue.credits) : '',
   })
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
   }
 
@@ -37,7 +24,7 @@ export default function EcueActions({ ecue, ues }: { ecue: Ecue; ues: Ue[] }) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const res = await fetch(`/api/admin/ecues/${ecue.id}`, {
+    const res = await fetch(`/api/admin/ues/${ue.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
@@ -51,14 +38,14 @@ export default function EcueActions({ ecue, ues }: { ecue: Ecue; ues: Ue[] }) {
 
   async function handleDelete() {
     setLoading(true)
-    const res = await fetch(`/api/admin/ecues/${ecue.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/admin/ues/${ue.id}`, { method: 'DELETE' })
     if (!res.ok) { setLoading(false); return }
     router.refresh()
   }
 
   if (mode === 'edit') {
     return (
-      <td colSpan={7} className="px-4 py-3 bg-blue-50">
+      <td colSpan={5} className="px-4 py-3 bg-blue-50">
         <form onSubmit={handleSave} className="flex flex-wrap gap-2 items-end">
           <div>
             <label className="text-xs text-gray-500 block mb-1">Code</label>
@@ -71,29 +58,9 @@ export default function EcueActions({ ecue, ues }: { ecue: Ecue; ues: Ue[] }) {
               className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Coef.</label>
-            <input name="coefficient" type="number" step="0.5" min="0.5" value={form.coefficient} onChange={handleChange}
-              className="w-16 px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
             <label className="text-xs text-gray-500 block mb-1">Crédits</label>
             <input name="credits" type="number" min="1" value={form.credits} onChange={handleChange}
               className="w-16 px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="min-w-[160px]">
-            <label className="text-xs text-gray-500 block mb-1">UE</label>
-            <select name="ue_id" value={form.ue_id} onChange={handleChange}
-              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">Aucune</option>
-              {ues.map(u => (
-                <option key={u.id} value={u.id}>{u.code} — {u.nom}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 min-w-[160px]">
-            <label className="text-xs text-gray-500 block mb-1">Feuille Google Sheet</label>
-            <input name="google_sheet_name" value={form.google_sheet_name} onChange={handleChange}
-              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div className="flex gap-2">
             <button type="submit" disabled={loading}
@@ -113,9 +80,11 @@ export default function EcueActions({ ecue, ues }: { ecue: Ecue; ues: Ue[] }) {
 
   if (mode === 'confirm-delete') {
     return (
-      <td colSpan={7} className="px-4 py-3 bg-red-50">
+      <td colSpan={5} className="px-4 py-3 bg-red-50">
         <div className="flex items-center gap-3">
-          <span className="text-xs text-red-700">Supprimer <strong>{ecue.nom}</strong> ?</span>
+          <span className="text-xs text-red-700">
+            Supprimer <strong>{ue.nom}</strong> ? Les ECUEs rattachées seront détachées (pas supprimées).
+          </span>
           <button onClick={handleDelete} disabled={loading}
             className="px-3 py-1.5 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
             {loading ? '...' : 'Confirmer'}
